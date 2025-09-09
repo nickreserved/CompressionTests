@@ -25,8 +25,7 @@ namespace MGroup.Solvers.Assemblers
         bool isIndexerCached = false;
         private int[] cachedColIndices, cachedRowOffsets;
 
-		public DuViCompressedSparseMatrix CreateEmptyMatrix(ISubdomainFreeDofOrdering dofOrdering) =>
-            new DuViCompressedSparseMatrix(dofOrdering.NumFreeDofs, dofOrdering.NumFreeDofs);
+		public DuViCompressedSparseMatrix CreateEmptyMatrix(ISubdomainFreeDofOrdering dofOrdering) => new(dofOrdering.NumFreeDofs, dofOrdering.NumFreeDofs);
 
         public DuViCompressedSparseMatrix BuildGlobalMatrix(ISubdomainFreeDofOrdering dofOrdering, IEnumerable<MGroup.MSolve.Discretization.IElementType> elements, 
             IElementMatrixProvider matrixProvider)

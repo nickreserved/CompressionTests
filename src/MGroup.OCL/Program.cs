@@ -14,13 +14,23 @@ namespace Compression.src.MGroup.OCL
 {
     public class Program
     {
-        public static CLProgram CreateProgram(OpenCL instance, String programFile)
+        /// <summary>
+        /// Create a program, load a precompiled program or compile the source of a program.
+        /// </summary>
+        /// <param name="instance">OpenCL instance</param>
+        /// <param name="programFile">Path and filename of source file of the program without extension ".cl"</param>
+        /// <param name="compilerOptions">Compiler options. They take place only if precompiled program will not found. It becomes part of binary file name. Optional.</param>
+        /// <returns>The OpenCL program</returns>
+        public static CLProgram CreateProgram(OpenCL instance, String programFile, String? compilerOptions = null)
         {
             CLProgram program;
             // Because instance has only the deviceId, we must re-get the name of device
             String[] binaryFilename = new string[instance.Devices.Length];
             for (int i = 0; i < binaryFilename.Length; ++i)
-                binaryFilename[i] = programFile + "." + ((String)OpenCL.GetDeviceInfo(instance.Devices[i], CLDeviceInfo.Name)).TrimEnd('\0') + ".bin";
+            {
+                String co = compilerOptions != null ? "." + compilerOptions : "";
+                binaryFilename[i] = programFile + co + "." + ((String)OpenCL.GetDeviceInfo(instance.Devices[i], CLDeviceInfo.Name)).TrimEnd('\0') + ".bin";
+            }
 
             try   // try to load a binary from a previous compiled source if exist - if not, or if it is wrong, fallback to source
             {
@@ -35,7 +45,7 @@ namespace Compression.src.MGroup.OCL
             {
                 program = instance.CreateProgramWithSource(File.ReadAllText(programFile + ".cl"));
                 const String BUILD_LOG_FILE = "OpenCLBuildingError.log";
-                try { instance.BuildProgram(program, instance.Devices, null); }
+                try { instance.BuildProgram(program, instance.Devices, compilerOptions); }
                 catch
                 {
                     File.WriteAllBytes(BUILD_LOG_FILE, Encoding.UTF8.GetBytes((String)

@@ -34,6 +34,15 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="src\MGroup.OCL\CsrGeometricMultigrid.cl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="src\MGroup.OCL\DuViGeometricMultigrid.cl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="src\MGroup.OCL\DuViGeometricMultigridLocal.cl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Update="src\MGroup.OCL\HybridGaussSeidel.cl">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

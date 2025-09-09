@@ -1,4 +1,5 @@
-﻿using Compression.src.MGroup.LinearAlgebra.Iterative.Stationary;
+﻿using CASS.OpenCL;
+using Compression.src.MGroup.LinearAlgebra.Iterative.Stationary;
 using MGroup.LinearAlgebra.Iterative;
 using MGroup.LinearAlgebra.Iterative.Stationary;
 using MGroup.LinearAlgebra.Iterative.Stationary.CSR;
@@ -7,14 +8,16 @@ using MGroup.LinearAlgebra.Matrices.Builders;
 using MGroup.LinearAlgebra.Triangulation;
 using MGroup.LinearAlgebra.Vectors;
 using System.Diagnostics;
+using System.Xml.Linq;
 
 namespace Compression.src.MGroup.Solvers.Multigrid
 {
-    public class GeometricMultigridSolver
+    public class GeometricMultigridSolver : IGeometricMultigridSolver
     {
         public enum MatrixType { CSR, DU_VI }
 
         private IGeometricMultigridModel Model;
+        private bool GaussSeidel;
         private bool[] LevelDown;
         private int[] LevelIterations;
         private int firstLevel;
@@ -37,36 +40,37 @@ namespace Compression.src.MGroup.Solvers.Multigrid
 
         public bool IsStepDown(int i) => LevelDown[i];
 
-        public static GeometricMultigridSolver createSimpleV(IGeometricMultigridModel model, MatrixType matType = MatrixType.CSR,
+        public static GeometricMultigridSolver createSimpleV(IGeometricMultigridModel model, bool GaussSeidel = true, MatrixType matType = MatrixType.CSR,
                                     int maxCircleIterations = MaxCircleIterations, double convergenceTolerance = 1e-6, int fineLevelIterations = 4)
         {
-            GeometricMultigridSolver a = new GeometricMultigridSolver(model);
-            a.Initialize(maxCircleIterations, convergenceTolerance, new bool[] { true, false }, new int[] { fineLevelIterations }, matType);
+            GeometricMultigridSolver a = new GeometricMultigridSolver(model, GaussSeidel);
+            a.Initialize(matType, maxCircleIterations, convergenceTolerance, new bool[] { true, false }, new int[] { fineLevelIterations });
             return a;
         }
 
-        public static GeometricMultigridSolver createDeepV(IGeometricMultigridModel model, MatrixType matType = MatrixType.CSR,
+        public static GeometricMultigridSolver createDeepV(IGeometricMultigridModel model, bool GaussSeidel = true, MatrixType matType = MatrixType.CSR,
                            int maxCircleIterations = MaxCircleIterations, double convergenceTolerance = 1e-6, int depth = 2, int levelIterations = 4)
         {
-            GeometricMultigridSolver a = new GeometricMultigridSolver(model);
-            a.Initialize(maxCircleIterations, convergenceTolerance,
-                        Enumerable.Repeat(true, depth).Concat(Enumerable.Repeat(false, depth)).ToArray(),
-                        new int[] { levelIterations }, matType);
+            GeometricMultigridSolver a = new GeometricMultigridSolver(model, GaussSeidel);
+            a.Initialize(matType, maxCircleIterations,
+                        convergenceTolerance,
+                        Enumerable.Repeat(true, depth).Concat(Enumerable.Repeat(false, depth)).ToArray(), new int[] { levelIterations });
             return a;
         }        
 
-        public static GeometricMultigridSolver createDeepV(IGeometricMultigridModel model, int[] levelIterations, MatrixType matType = MatrixType.CSR,
+        public static GeometricMultigridSolver createDeepV(IGeometricMultigridModel model, int[] levelIterations, bool GaussSeidel = true, MatrixType matType = MatrixType.CSR,
                             int maxCircleIterations = MaxCircleIterations, double convergenceTolerance = 1e-6)
         {
-            GeometricMultigridSolver a = new GeometricMultigridSolver(model);
-            a.Initialize(maxCircleIterations, convergenceTolerance,
-                        Enumerable.Repeat(true, levelIterations.Length / 2).Concat(Enumerable.Repeat(false, levelIterations.Length / 2)).ToArray(),
-                        levelIterations, matType);
+            GeometricMultigridSolver a = new GeometricMultigridSolver(model, GaussSeidel);
+            a.Initialize(matType, maxCircleIterations,
+                        convergenceTolerance,
+                        Enumerable.Repeat(true, levelIterations.Length / 2).Concat(Enumerable.Repeat(false, levelIterations.Length / 2)).ToArray(), levelIterations);
             return a;
         }
 
-        public GeometricMultigridSolver(IGeometricMultigridModel model) => Model = model;
-        public void Initialize(int maxCircleIterations, double convergenceTolerance, bool[] levelDown, int[] levelIterations, MatrixType matType)
+        public GeometricMultigridSolver(IGeometricMultigridModel model, bool GS) { Model = model; GaussSeidel = GS; }
+
+        public void Initialize(MatrixType matType, int maxCircleIterations, double convergenceTolerance, bool[] levelDown, int[] levelIterations)
         {
             this.matType = matType;
             LevelDown = levelDown;
@@ -116,17 +120,60 @@ namespace Compression.src.MGroup.Solvers.Multigrid
             }
             SkylineMatrix coarseStiffness = SkylineMatrix.CreateFromMatrix(A.BuildCsrMatrix(true).CopyToFullMatrix(), 1e-15);
             coarseStiffnessLdlFactorized = coarseStiffness.FactorLdl(true, 1e-15);
+
+#if DEBUG
+            //OutputMatrix(LevelStiffness);
+            File.Delete(GetLogPath());
+#endif
+        }
+        private static void OutputMatrix(IMatrixView[] A)
+        {
+#if DEBUG
+            string path = "csr_matrices_cpu.txt";
+            File.Delete(path);
+            for (int i = 0; i < A.Length; ++i)
+            {
+                if (i == 1)
+                {
+                    Matrix B = A[i].CopyToFullMatrix();
+                    string line = "stiffness_matrix(" + i + ") = [" + Environment.NewLine;
+                    for (int m = 0; m < B.NumRows; ++m)
+                        line += string.Join(" ", B.GetRow(m).RawData.Select(e => e.ToString(/*"G4"*/))) + Environment.NewLine;
+                    line += "]" + Environment.NewLine + Environment.NewLine;
+                    //                    line += "_matrix(" + k + ") = [" + string.Join(Environment.NewLine, A[i].CopyToFullMatrix().RawData.Select(e => e.ToString("G6"))) + "]" + Environment.NewLine;
+                    File.AppendAllText(path, line);
+                }
+            }
+#endif
         }
 
-        public (IterativeStatistics, double[]) Solve(Vector xInitialGuess)
+
+        private string GetLogPath() => "output_" + (matType == MatrixType.CSR ? "csr_" : "duvi_") + (GaussSeidel ? "gauss_seidel" : "jacobi") + "_cpu.txt";
+
+        private void OutputVectorX(int currentLevel, Vector[] x, string name)
         {
-            IStationaryIteration[] methodGaussSeidel = new IStationaryIteration[totalLevels - 1];
-            for (int i = 0; i < methodGaussSeidel.Length; ++i)
+#if DEBUG
+            OutputVectorX(currentLevel, x[currentLevel], name);
+#endif
+        }
+
+        private void OutputVectorX(int currentLevel, Vector x, string name)
+        {
+#if DEBUG
+            string line = name + "(" + currentLevel + ") = [" + string.Join(" ", x.RawData.Select(e => e.ToString("G14"))) + "]" + Environment.NewLine;
+            File.AppendAllText(GetLogPath(), line);
+#endif
+        }
+
+        public (IterativeStatistics, double[]) Solve(Vector? xInitialGuess)
+        {
+            IStationaryIteration[] stationaryIteration = new IStationaryIteration[totalLevels - 1];
+            for (int i = 0; i < stationaryIteration.Length; ++i)
             {
-                methodGaussSeidel[i] = matType == MatrixType.CSR
-                    ? new GaussSeidelIterationCsr()
-                    : new GaussSeidelIterationCsrDuVi();
-                methodGaussSeidel[i].UpdateMatrix(LevelStiffness[i], false);
+                stationaryIteration[i] = matType == MatrixType.CSR
+                    ? GaussSeidel ? new GaussSeidelIterationCsr() : new JacobiIterationCsr()
+                    : GaussSeidel ? new GaussSeidelIterationCsrDuVi() : new GaussSeidelIterationCsrDuVi(); //TODO: needs implementation of Jacobi for DuVi matrices
+                stationaryIteration[i].UpdateMatrix(LevelStiffness[i], false);
             }
 
             Vector[] x = new Vector[totalLevels - 1];
@@ -154,16 +201,28 @@ namespace Compression.src.MGroup.Solvers.Multigrid
 
                     if (currentLevel == totalLevels - 1)
                     {
+                        OutputVectorX(currentLevel, r, "B");
                         Vector eCoarse = coarseStiffnessLdlFactorized.SolveLinearSystem(r[currentLevel]);
+                        OutputVectorX(currentLevel, eCoarse, "X");
                         Vector eFine = interpolation.Last().Multiply(eCoarse);
                         x[currentLevel - 1].AddIntoThis(eFine);
+                        OutputVectorX(currentLevel - 1, x, "X");
                     }
                     else
                     {
+                        //TODO: remove me
+                        if (currentLevel == 1 && !LevelDown[step]) OutputVectorX(currentLevel, r, "b");
+
+
                         // try to solve A * xInitialGuess = b
                         int lvlIter = LevelIterations[Math.Min(currentLevel, LevelIterations.Length - 1)];
                         for (int i = 0; i < lvlIter; ++i)
-                            methodGaussSeidel[currentLevel].Execute(r[currentLevel], x[currentLevel]);
+                        {
+                            //TODO: remove me
+                            if (currentLevel == 1 && !LevelDown[step]) OutputVectorX(currentLevel, x, "x");
+                            stationaryIteration[currentLevel].Execute(r[currentLevel], x[currentLevel]);
+                        }
+                        if (currentLevel == 1 && !LevelDown[step]) OutputVectorX(currentLevel, x, "x");
 
                         if (LevelDown[step])
                         {
@@ -174,9 +233,16 @@ namespace Compression.src.MGroup.Solvers.Multigrid
                             // small residual or exceeded the iteration number
                             if (currentLevel == 0)
                             {
+                                bool converged = true;
+                                bool failed = false;
+                                for (int i = 0; i < rFine.Length; ++i)
+                                {
+                                    double p = Math.Abs(rFine[i]);
+                                    if (Double.IsNaN(p) || p > 1e50) { failed = true; converged = false; break; }  
+                                    else if (p > ConvergenceTolerance) { converged = false; break; } 
+                                }
                                 double residual = rFine.Norm2();
-                                bool converged = residual <= ConvergenceTolerance;
-                                if (converged || iterations > MaxIterations)
+                                if (converged || failed || iterations > MaxIterations)
                                 {
                                     IterativeStatistics stats = new IterativeStatistics();
                                     stats.NumIterationsRequired = iterations;
@@ -185,6 +251,10 @@ namespace Compression.src.MGroup.Solvers.Multigrid
                                     return (stats, time);
                                 }
                             }
+
+                            OutputVectorX(currentLevel, r, "B");
+                            OutputVectorX(currentLevel, x, "X");
+                            OutputVectorX(currentLevel, rFine, "R");
 
                             // fine residual to coarse residual
                             r[currentLevel + 1] = restriction[currentLevel].Multiply(rFine);
@@ -195,6 +265,9 @@ namespace Compression.src.MGroup.Solvers.Multigrid
                         {
                             Vector eFine = interpolation[currentLevel - 1].Multiply(x[currentLevel]);
                             x[currentLevel - 1].AddIntoThis(eFine);
+
+                            OutputVectorX(currentLevel, x, "X");
+                            OutputVectorX(currentLevel - 1, x, "X");
                         }
                     }
                     // Multigrid level time count

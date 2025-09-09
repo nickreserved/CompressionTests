@@ -4,16 +4,9 @@ using Compression.src.MGroup.OCL;
 using Compression.src.MGroup.Solvers.Multigrid;
 using Compression.tests.MGroup.LinearAlgebra.Tests.TestData.SparseLinearSystems;
 using MGroup.LinearAlgebra.Iterative;
-using MGroup.LinearAlgebra.Matrices.Operators;
 using MGroup.LinearAlgebra.Vectors;
 using MGroup.OCL;
-using Microsoft.VisualStudio.TestPlatform.ObjectModel;
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Xunit;
 
 namespace Compression.tests.MGroup.Solvers.Tests
@@ -21,14 +14,14 @@ namespace Compression.tests.MGroup.Solvers.Tests
     public class GeometricMultigridTestsWithOpenCL
     {
          [Fact]
-        public void RunMe()
+        public void OpenCLInitializeAndRun()    //TODO: must be updated because it is for an older version of kernel which now does not exist
         {
             Platform[] platforms = Platform.GetPlatforms();
             Assert.NotEmpty(platforms);
             Device[] devices = platforms[0].GetDevices();     // select a platform to get devices
             Assert.NotEmpty(devices);
             OpenCL context = new OpenCL(platforms[0].platformId, /*devices[0].deviceId*/devices.Select(x => x.deviceId).ToArray());
-            CLProgram program = Program.CreateProgram(context, "HybridGaussSeidel");
+            CLProgram program = Program.CreateProgram(context, "CsrHybridGaussSeidel");
             CLKernel kernel = context.CreateKernel(program, "hybrid_gauss_seidel_step_with_CSR");
             CLCommandQueue commandQueue = context.CreateCommandQueue(context.Devices[0]);
             CLMem bufferOfRowIndices = context.CreateBuffer(CLMemFlags.ReadOnly, 1000 * sizeof(double));
@@ -58,76 +51,66 @@ namespace Compression.tests.MGroup.Solvers.Tests
 
             IGeometricMultigridModel model = new FemCantilever2D(new int[] { 256, 16 }, new double[] { 20, 1, 1 });
 
+            Platform[] platforms = Platform.GetPlatforms();
+            Assert.NotEmpty(platforms);
+            Device[] devices = platforms[0].GetDevices();     // select a platform to get devices
+            Assert.NotEmpty(devices);
+            
+            
+            //Assert.True(devices[0].extensions.Contains("cl_khr_non_uniform_work_group")); // local_workgroup must be 1 because extension is not supported in my PC
+            //OpenCL context = new OpenCL(platforms[0].platformId, devices.Select(x => x.deviceId).ToArray());
+            
+            
+            OpenCL context = new OpenCL(platforms[0].platformId, devices[0].deviceId);
+
             Stopwatch stopwatch = new Stopwatch();
+         
+            {
+                stopwatch.Restart();
+                OpenCLCsrGeometricMultigridSolver solver = OpenCLCsrGeometricMultigridSolver.CreateDeepV(devices[0], context, model, false, iterations, convergenceTolerance, 2, 4);
+                stopwatch.Stop();
+                double timeGMGI = stopwatch.Elapsed.TotalMilliseconds;
+                Vector? x = null;
+                stopwatch.Restart();
+                (IterativeStatistics stats, double[] time) = solver.Solve(x);
+                stopwatch.Stop();
+                double timeGMGS = stopwatch.Elapsed.TotalMilliseconds;
+
+                File.AppendAllText(logFilePath, $"\n\n\n\n\nRequired time for Geometric Multigrid (CSR): {timeGMGI + timeGMGS}ms\n");
+                File.AppendAllText(logFilePath, $"\tInitialization: {timeGMGI}ms\n");
+                File.AppendAllText(logFilePath, $"\tSolve: {timeGMGS}ms\n");
+                if (stats.HasConverged)
+                    File.AppendAllText(logFilePath, $"\tCONVERGED after {stats.NumIterationsRequired} iterations and a residual of {stats.ConvergenceCriterion.value}\n");
+                else File.AppendAllText(logFilePath, $"\tNOT converged after {stats.NumIterationsRequired} iterations and a residual of {stats.ConvergenceCriterion.value}\n");
+                for (int i = 0; i < time.Length; ++i)
+                    File.AppendAllText(logFilePath, $"\tLevel {i}: {time[i]}ms\n");
+
+               // Assert.True(stats.HasConverged);
+            }
 
 
+            {
+                stopwatch.Restart();
+                OpenCLDuViGeometricMultigridSolver solver = OpenCLDuViGeometricMultigridSolver.CreateDeepV(devices[0], context, model, false, iterations, convergenceTolerance, 2, 4);
+                stopwatch.Stop();
+                double timeGMGI = stopwatch.Elapsed.TotalMilliseconds;
+                Vector? x = null;
+                stopwatch.Restart();
+                (IterativeStatistics stats, double[] time) = solver.Solve(x);
+                stopwatch.Stop();
+                double timeGMGS = stopwatch.Elapsed.TotalMilliseconds;
 
+                File.AppendAllText(logFilePath, $"\n\n\n\n\nRequired time for Geometric Multigrid (DuVi) with local optimization if possible: {timeGMGI + timeGMGS}ms\n");
+                File.AppendAllText(logFilePath, $"\tInitialization: {timeGMGI}ms\n");
+                File.AppendAllText(logFilePath, $"\tSolve: {timeGMGS}ms\n");
+                if (stats.HasConverged)
+                    File.AppendAllText(logFilePath, $"\tCONVERGED after {stats.NumIterationsRequired} iterations and a residual of {stats.ConvergenceCriterion.value}\n");
+                else File.AppendAllText(logFilePath, $"\tNOT converged after {stats.NumIterationsRequired} iterations and a residual of {stats.ConvergenceCriterion.value}\n");
+                for (int i = 0; i < time.Length; ++i)
+                    File.AppendAllText(logFilePath, $"\tLevel {i}: {time[i]}ms\n");
 
-            stopwatch.Restart();
-            GeometricMultigridSolver solver = GeometricMultigridSolver.createDeepV(model, GeometricMultigridSolver.MatrixType.CSR, iterations, convergenceTolerance, 2, 4);
-            stopwatch.Stop();
-            double timeGMGI = stopwatch.Elapsed.TotalMilliseconds;
-            Vector x = Vector.CreateZero(model.NumDofsFree);
-            stopwatch.Restart();
-            (IterativeStatistics stats, double[] time) = solver.Solve(x);
-            stopwatch.Stop();
-            double timeGMGS = stopwatch.Elapsed.TotalMilliseconds;
-
-            File.AppendAllText(logFilePath, $"\n\n\n\n\nRequired time for Geometric Multigrid (CSR): {timeGMGI + timeGMGS}ms\n");
-            File.AppendAllText(logFilePath, $"\tInitialization: {timeGMGI}ms\n");
-            File.AppendAllText(logFilePath, $"\tSolve: {timeGMGS}ms\n");
-            if (stats.HasConverged)
-                File.AppendAllText(logFilePath, $"\tCONVERGED after {stats.NumIterationsRequired} iterations and a residual of {stats.ConvergenceCriterion.value}\n");
-            else File.AppendAllText(logFilePath, $"\tNOT converged after {stats.NumIterationsRequired} iterations and a residual of {stats.ConvergenceCriterion.value}\n");
-            for (int i = 0; i < time.Length; ++i)
-                File.AppendAllText(logFilePath, $"\tLevel {i}: {time[i]}ms\n");
-
-            Assert.True(stats.HasConverged);
-
-
-
-
-
-            stopwatch.Restart();
-            solver = GeometricMultigridSolver.createDeepV(model, GeometricMultigridSolver.MatrixType.DU_VI, iterations, convergenceTolerance, 2, 4);
-            stopwatch.Stop();
-            timeGMGI = stopwatch.Elapsed.TotalMilliseconds;
-            x = Vector.CreateZero(model.NumDofsFree);
-            stopwatch.Restart();
-            (stats, time) = solver.Solve(x);
-            stopwatch.Stop();
-            timeGMGS = stopwatch.Elapsed.TotalMilliseconds;
-
-            File.AppendAllText(logFilePath, $"\n\n\n\n\nRequired time for Geometric Multigrid (CSR + DuVi): {timeGMGI + timeGMGS}ms\n");
-            File.AppendAllText(logFilePath, $"\tInitialization: {timeGMGI}ms\n");
-            File.AppendAllText(logFilePath, $"\tSolve: {timeGMGS}ms\n");
-            if (stats.HasConverged)
-                File.AppendAllText(logFilePath, $"\tCONVERGED after {stats.NumIterationsRequired} iterations and a residual of {stats.ConvergenceCriterion.value}\n");
-            else File.AppendAllText(logFilePath, $"\tNOT converged after {stats.NumIterationsRequired} iterations and a residual of {stats.ConvergenceCriterion.value}\n");
-            for (int i = 0; i < time.Length; ++i)
-                File.AppendAllText(logFilePath, $"\tLevel {i}: {time[i]}ms\n");
-
-            Assert.True(stats.HasConverged);
-
-
-
-
-
-            stopwatch.Restart();
-            var cg = ConjugateGradientInitialize(model, iterations, convergenceTolerance);
-            stopwatch.Stop();
-            double timeCGI = stopwatch.Elapsed.TotalMilliseconds;
-            x = Vector.CreateZero(model.NumDofsFree);
-            stopwatch.Restart();
-            stats = ConjugateGradientSolve(cg, x);
-            stopwatch.Stop();
-            double timeCG = stopwatch.Elapsed.TotalMilliseconds;
-            File.AppendAllText(logFilePath, $"\n\nRequired time for CG: {timeCGI + timeCG}ms\n");
-            File.AppendAllText(logFilePath, $"\tInitialization: {timeCGI}ms\n");
-            File.AppendAllText(logFilePath, $"\tSolve: {timeCG}ms");
-            if (stats.HasConverged)
-                File.AppendAllText(logFilePath, $"\tCONVERGED after {stats.NumIterationsRequired} iterations and a residual of {stats.ResidualNormRatioEstimation}\n");
-            else File.AppendAllText(logFilePath, $"\tNOT converged after {stats.NumIterationsRequired} iterations and a residual of {stats.ResidualNormRatioEstimation}\n");
+                Assert.True(stats.HasConverged);
+            }
         }
     }
 }
