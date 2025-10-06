@@ -9,6 +9,8 @@
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'" />
+
   <ItemGroup>
     <PackageReference Include="MGroup.FEM.Structural" Version="0.2.0-unstable.137" />
     <PackageReference Include="MGroup.LinearAlgebra" Version="0.1.0-unstable.224" />

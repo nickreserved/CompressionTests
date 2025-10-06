@@ -1,101 +1,3 @@
-// ---------------------------------------------- ITERATIONS OF GAUSS - SEIDEL & JACOBI METHODS ----
-
-
-/** An initial Jacobi iteration with initial guess vector zero.
-\param row_indices Indices to first element of matrix's each row.
-\param column_indices Column index for each element. It makes 1-1 pair with \a values.
-\param values Value for each element. It makes 1-1 pair with \a column_indices.
-\param b Values of rhs dense vector elements.
-\param[out] x Values of result dense vector elements.
-\param rows Number of rows in matrix. */
-__kernel void jacobi_initial_iteration(
-	__global const uint *row_indices,
-	__global const uint *column_indices,
-	__global const double *values,
-	__global const double *b,
-	__global double *x,
-	uint rows)
-{
-	uint row = get_global_id(0);
-	if (row >= rows) return;
-
-	uint index    = row_indices[row];
-	uint index_to = row_indices[row + 1];
-
-	for (; index < index_to; ++index)		// linear search (not binary - not serial)
-		if (column_indices[index] == row)
-		{
-			x[row] = b[row] / values[index];
-			break;
-		}
-}
-
-/** A Jacobi iteration.
-\param row_indices Indices to first element of matrix's each row.
-\param column_indices Column index for each element. It makes 1-1 pair with \a values.
-\param values Value for each element. It makes 1-1 pair with \a column_indices.
-\param b Values of rhs dense vector elements.
-\param x Values of lhs dense vector elements.
-\param[out] y Values of result dense vector elements.
-\param rows Number of rows in matrix. */
-__kernel void jacobi_iteration(
-	__global const uint *row_indices,
-	__global const uint *column_indices,
-	__global const double *values,
-	__global const double *b,
-	__global const double *x,
-	__global double *y,
-	uint rows)
-{
-	uint row = get_global_id(0);
-	if (row >= rows) return;
-
-	double diag = 0;
-	y[row] = b[row];
-
-	uint index    = row_indices[row];
-	uint index_to = row_indices[row + 1];
-
-	for (; index < index_to; ++index)
-		if (column_indices[index] == row) diag = values[index];
-		else y[row] -= values[index] * x[column_indices[index]];
-
-	y[row] /= diag;
-}
-
-/** A hybrid Gauss-Seidel iteration.
-\param row_indices Indices to first element of matrix's each row.
-\param column_indices Column index for each element. It makes 1-1 pair with \a values.
-\param values Value for each element. It makes 1-1 pair with \a column_indices.
-\param b Values of rhs dense vector elements.
-\param[in,out] x Values of lhs dense vector elements. Initially has the initial guess. On return, it
-has the one-step-converged vector.
-\param rows Number of rows in matrix. */
-__kernel void gauss_seidel_iteration(
-	__global const uint *row_indices,
-	__global const uint *column_indices,
-	__global const double *values,
-	__global const double *b,
-	__global double *x,
-	uint rows)
-{
-	uint row = get_global_id(0);
-	if (row >= rows) return;
-
-	double diag = 0;
-	double res = b[row];
-
-	uint index    = row_indices[row];
-	uint index_to = row_indices[row + 1];
-
-	for (; index < index_to; ++index)
-		if (column_indices[index] == row) diag = values[index];
-		else res -= values[index] * x[column_indices[index]];
-
-	x[row] = res / diag;	// race condition but without problem (old or new value, doesn't matter)
-}
-
-
 //-------------------------------------------------------------- MATRIX - VECTOR MULTIPLICATION ----
 
 
@@ -179,9 +81,9 @@ void residual_partial(
 	__global const double *x,
 	__global double *r)
 {
-	// r_n = A_n * x_n
+	// r = A * x
 	matrix_vector_product_partial(row_indices, column_indices, values, row, x, r, true);
-	// r_n = b_n - r_n
+	// r = b - r
 	r[row] = b[row] - r[row];
 }
 
@@ -203,7 +105,7 @@ __kernel void residual(
 	uint row = get_global_id(0);
 	if (row >= rows) return;
 	
-	// r_0 = b_0 - A_0  * x_0
+	// r = b - A * x
 	residual_partial(row_indices, column_indices, values, row, b, x, r);
 }
 
@@ -236,4 +138,88 @@ __kernel void residual_with_check(
 	double c = fabs(r[row]);
 	if (isnan(r[row]) || c > 1e50) atomic_or (is_zero, 2);
 	else if (c > tolerance)        atomic_and(is_zero, 2);	//atomic_store(is_zero, 0);
+}
+
+
+// -------------------------------------------------------------------- GAUSS - SEIDEL & JACOBI ----
+
+
+/** An initial Jacobi iteration with initial guess vector zero.
+\param preconditioner The Jacobi preconditioner vector of matrix multiplied with w = 2 / lmax where
+lmax is an upper bound of eigenvalues of matrix.
+\param b Values of rhs dense vector elements.
+\param[out] x Values of result dense vector elements.
+\param rows Number of rows in matrix. */
+__kernel void jacobi_initial_iteration(
+	__global const double *preconditioner,
+	__global const double *b,
+	__global double *x,
+	uint rows)
+{
+	uint row = get_global_id(0);
+	if (row >= rows) return;
+
+	// x = x + w * D^-1 * (b - A * x) where x = 0, so x = w * D^-1 * b
+	x[row] = preconditioner[row] * b[row];
+}
+
+/** A Jacobi iteration.
+\param preconditioner The Jacobi preconditioner vector of matrix multiplied with w = 2 / lmax where
+lmax is an upper bound of eigenvalues of matrix.
+\param row_indices Indices to first element of matrix's each row.
+\param column_indices Column index for each element. It makes 1-1 pair with \a values.
+\param values Value for each element. It makes 1-1 pair with \a column_indices.
+\param b Values of rhs dense vector elements.
+\param x Values of lhs dense vector elements.
+\param[out] y Values of result dense vector elements.
+\param rows Number of rows in matrix. */
+__kernel void jacobi_iteration(
+	__global const double *preconditioner,
+	__global const uint *row_indices,
+	__global const uint *column_indices,
+	__global const double *values,
+	__global const double *b,
+	__global const double *x,
+	__global double *y,
+	uint rows)
+{
+	uint row = get_global_id(0);
+	if (row >= rows) return;
+	
+	// final result: y = x + w * D^-1 * (b - A * x)
+	// y = b - A * x
+	residual_partial(row_indices, column_indices, values, row, b, x, y);
+	// y = x + w * D^-1 * y
+	y[row] = x[row] + preconditioner[row] * y[row];
+}
+
+/** A hybrid Gauss-Seidel iteration.
+\param preconditioner The Jacobi preconditioner vector of matrix multiplied with w = 2 / lmax where
+lmax is an upper bound of eigenvalues of matrix.
+\param row_indices Indices to first element of matrix's each row.
+\param column_indices Column index for each element. It makes 1-1 pair with \a values.
+\param values Value for each element. It makes 1-1 pair with \a column_indices.
+\param b Values of rhs dense vector elements.
+\param[in,out] x Values of lhs dense vector elements. Initially has the initial guess. On return, it
+has the one-step-converged vector.
+\param y Intermediate buffer.
+\param rows Number of rows in matrix. */
+__kernel void gauss_seidel_iteration(
+	__global const double *preconditioner,
+	__global const uint *row_indices,
+	__global const uint *column_indices,
+	__global const double *values,
+	__global const double *b,
+	__global double *x,
+	__global double *y,
+	uint rows)
+{
+	uint row = get_global_id(0);
+	if (row >= rows) return;
+	
+	// final result: x += w * D^-1 * (b - A * x)
+	// y = b - A * x
+	residual_partial(row_indices, column_indices, values, row, b, x, y);
+	// x += w * D^-1 * y
+	x[row] += preconditioner[row] * y[row];
 }

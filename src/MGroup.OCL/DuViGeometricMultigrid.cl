@@ -27,207 +27,7 @@ void copy_values(
 
     barrier(CLK_LOCAL_MEM_FENCE);
 }
-#else	// jacobi_initial_iteration() is the same. Use the version without USE_LOCAL_MEMORY
-
-
-// ---------------------------------------------- ITERATIONS OF GAUSS - SEIDEL & JACOBI METHODS ----
-
-
-/** An initial Jacobi iteration with initial guess vector zero.
-\param row_indices_on_column_indices Indices to first block of matrix's each row.
-\param row_indices_on_delta_distance_indices Distance array index of each row's block distances in
-block (elements - 1 in block).
-\param column_indices Column index for the first element of each row's block.
-\param delta_distances Distance between block's elements (0 is 1) - First distance of block is
-actually the number of distances in block (elements - 1 in block).
-\param value_indices The index to a distinct value. They make pairs with \a delta_distances.
-\param values Distinct values of matrix elements.
-\param b Values of rhs dense vector elements.
-\param[out] x Values of result dense vector elements.
-\param rows Number of rows in matrix. */
-__kernel void jacobi_initial_iteration(
-	__global const uint *row_indices_on_column_indices,
-	__global const uint *row_indices_on_delta_distance_indices,
-	__global const uint *column_indices,
-	__global const uchar *delta_distances,
-	__global const ushort *value_indices,
-	__global const double *values,
-	__global const double *b,
-	__global double *x,
-	uint rows)
-{
-	uint row = get_global_id(0);
-	if (row >= rows) return;
-	
-	uint col_index    = row_indices_on_column_indices[row];
-	uint col_index_to = row_indices_on_column_indices[row + 1];
-	
-	for (; col_index < col_index_to && column_indices[col_index] <= row; ++col_index);  // unfortunately serial search
-	--col_index;
-
-	uint dist_index = row_indices_on_delta_distance_indices[row];
-	
-	uint column = column_indices[col_index];
-			
-	for (;;)
-	{
-		if (column == row)
-		{
-			x[row] = b[row] / values[value_indices[dist_index]];
-			break;
-		};
-		// break check cannot be in for(;;)
-		++dist_index;
-		column += delta_distances[dist_index] + 1;
-	}
-}
 #endif
-
-
-/** A Jacobi iteration.
-\param row_indices_on_column_indices Indices to first block of matrix's each row.
-\param row_indices_on_delta_distance_indices Distance array index of each row's block distances in
-block (elements - 1 in block).
-\param column_indices Column index for the first element of each row's block.
-\param delta_distances Distance between block's elements (0 is 1) - First distance of block is
-actually the number of distances in block (elements - 1 in block).
-\param value_indices The index to a distinct value. They make pairs with \a delta_distances.
-\param global_values Distinct values of matrix elements.
-\param b Values of rhs dense vector elements.
-\param x Values of lhs dense vector elements.
-\param[out] y Values of result dense vector elements.
-\param rows Number of rows in matrix.
-\param elements Number of distinct elements in matrix.
-\param values Distinct values of matrix elements. */
-__kernel void jacobi_iteration(
-	__global const uint *row_indices_on_column_indices,
-	__global const uint *row_indices_on_delta_distance_indices,
-	__global const uint *column_indices,
-	__global const uchar *delta_distances,
-	__global const ushort *value_indices,
-#ifdef USE_LOCAL_MEMORY
-	__global const double *global_values,
-#else
-	__global const double *values,
-#endif
-	__global const double *b,
-	__global const double *x,
-	__global double *y,
-#ifdef USE_LOCAL_MEMORY
-	uint rows,
-	uint elements,
-	__local double *values
-	)
-{
-	copy_values(global_values, values, elements);
-#else
-	uint rows)
-{
-#endif
-
-	uint row = get_global_id(0);
-	if (row >= rows) return;
-	
-	double diag = 0;
-	y[row] = b[row];
-	
-	uint col_index    = row_indices_on_column_indices[row];
-	uint col_index_to = row_indices_on_column_indices[row + 1];
-	
-	uint dist_index = row_indices_on_delta_distance_indices[row];
-	
-	for (; col_index < col_index_to; ++col_index)
-	{
-		uint column = column_indices[col_index];
-		
-		uint dist_index_to = dist_index + delta_distances[dist_index] + 1;
-				
-		for (;;)
-		{
-			double v = values[value_indices[dist_index]];
-			if (column == row) diag = v;
-			else y[row] -= v * x[column];
-			// break check cannot be in for(;;)
-			++dist_index;
-			if (dist_index == dist_index_to) break;
-			column += delta_distances[dist_index] + 1;	// because can access out of bounds
-		}
-	}
-
-	y[row] /= diag;
-}
-
-
-/** A Gauss-Seidel iteration.
-\param row_indices_on_column_indices Indices to first block of matrix's each row.
-\param row_indices_on_delta_distance_indices Distance array index of each row's block distances in
-block (elements - 1 in block).
-\param column_indices Column index for the first element of each row's block.
-\param delta_distances Distance between block's elements (0 is 1) - First distance of block is
-actually the number of distances in block (elements - 1 in block).
-\param value_indices The index to a distinct value. They make pairs with \a delta_distances.
-\param global_values Distinct values of matrix elements.
-\param b Values of rhs dense vector elements.
-\param[out] x Values of result dense vector elements.
-\param rows Number of rows in matrix.
-\param elements Number of distinct elements in matrix.
-\param values Distinct values of matrix elements. */
-__kernel void gauss_seidel_iteration(
-	__global const uint *row_indices_on_column_indices,
-	__global const uint *row_indices_on_delta_distance_indices,
-	__global const uint *column_indices,
-	__global const uchar *delta_distances,
-	__global const ushort *value_indices,
-#ifdef USE_LOCAL_MEMORY
-	__global const double *global_values,
-#else
-	__global const double *values,
-#endif
-	__global const double *b,
-	__global double *x,
-#ifdef USE_LOCAL_MEMORY
-	uint rows,
-	uint elements,
-	__local double *values
-	)
-{
-	copy_values(global_values, values, elements);
-#else
-	uint rows)
-{
-#endif
-
-	uint row = get_global_id(0);
-	if (row >= rows) return;
-	
-	double diag = 0;
-	double res = b[row];
-	
-	uint col_index    = row_indices_on_column_indices[row];
-	uint col_index_to = row_indices_on_column_indices[row + 1];
-	
-	uint dist_index = row_indices_on_delta_distance_indices[row];
-	
-	for (; col_index < col_index_to; ++col_index)
-	{
-		uint column = column_indices[col_index];
-		
-		uint dist_index_to = dist_index + delta_distances[dist_index] + 1;
-				
-		for (;;)
-		{
-			double v = values[value_indices[dist_index]];
-			if (column == row) diag = v;
-			else res -= v * x[column];
-			// break check cannot be in for(;;)
-			++dist_index;
-			if (dist_index == dist_index_to) break;
-			column += delta_distances[dist_index] + 1;	// because can access out of bounds
-		}
-	}
-
-	x[row] = res / diag;	// race condition but without problem (old or new value, doesn't matter)
-}
 
 
 //-------------------------------------------------------------- MATRIX - VECTOR MULTIPLICATION ----
@@ -256,7 +56,11 @@ void matrix_vector_product_partial(
 	__global const uint *column_indices,
 	__global const uchar *delta_distances,
 	__global const ushort *value_indices,
+#ifdef USE_LOCAL_MEMORY
 	__local const double *values,
+#else
+	__global const double *values,
+#endif
 	uint row,
 	__global const double *x,
 	__global double *y,
@@ -364,7 +168,11 @@ void residual_partial(
 	__global const uint *column_indices,
 	__global const uchar *delta_distances,
 	__global const ushort *value_indices,
+#ifdef USE_LOCAL_MEMORY
 	__local const double *values,
+#else
+	__global const double *values,
+#endif
 	uint row,
 	__global const double *b,
 	__global const double *x,
@@ -422,7 +230,7 @@ __kernel void residual(
 	uint row = get_global_id(0);
 	if (row >= rows) return;
 
-	// r_0 = b_0 - A_0  * x_0
+	// r = b - A  * x
 	residual_partial(row_indices_on_column_indices, row_indices_on_delta_distance_indices,
 						column_indices, delta_distances, value_indices, values, row, b, x, r);
 }
@@ -475,12 +283,148 @@ __kernel void residual_with_check(
 	uint row = get_global_id(0);
 	if (row >= rows) return;
 
-	// r_0 = b_0 - A_0  * x_0
+	// r = b_0 - A_0  * x_0
 	residual_partial(row_indices_on_column_indices, row_indices_on_delta_distance_indices,
 						column_indices, delta_distances, value_indices, values, row, b, x, r);
 	// if r_0 == 0 end
 	double c = fabs(r[row]);
-	atomic_or(is_zero, 255);
-	//if (isnan(r[row]) || c > 1e50) atomic_or (is_zero, 2);
-	//else if (c > tolerance)        atomic_and(is_zero, 2);	//atomic_store(is_zero, 0);
+	if (isnan(r[row]) || c > 1e50) atomic_or (is_zero, 2);
+	else if (c > tolerance)        atomic_and(is_zero, 2);	//atomic_store(is_zero, 0);
+}
+
+
+// ---------------------------------------------- ITERATIONS OF GAUSS - SEIDEL & JACOBI METHODS ----
+
+
+#ifndef USE_LOCAL_MEMORY 	// jacobi_initial_iteration() is the same. Use the version without USE_LOCAL_MEMORY
+/** An initial Jacobi iteration with initial guess vector zero.
+\param preconditioner The Jacobi preconditioner vector of matrix multiplied with w = 2 / lmax where
+lmax is an upper bound of eigenvalues of matrix.
+\param b Values of rhs dense vector elements.
+\param[out] x Values of result dense vector elements.
+\param rows Number of rows in matrix. */
+__kernel void jacobi_initial_iteration(
+	__global const double *preconditioner,
+	__global const double *b,
+	__global double *x,
+	uint rows)
+{
+	uint row = get_global_id(0);
+	if (row >= rows) return;
+
+	// x = x + w * D^-1 * (b - A * x) where x = 0, so x = w * D^-1 * b
+	x[row] = preconditioner[row] * b[row];
+}
+#endif
+
+
+/** A Jacobi iteration.
+\param preconditioner The Jacobi preconditioner vector of matrix multiplied with w = 2 / lmax where
+lmax is an upper bound of eigenvalues of matrix.
+\param row_indices_on_column_indices Indices to first block of matrix's each row.
+\param row_indices_on_delta_distance_indices Distance array index of each row's block distances in
+block (elements - 1 in block).
+\param column_indices Column index for the first element of each row's block.
+\param delta_distances Distance between block's elements (0 is 1) - First distance of block is
+actually the number of distances in block (elements - 1 in block).
+\param value_indices The index to a distinct value. They make pairs with \a delta_distances.
+\param global_values Distinct values of matrix elements.
+\param b Values of rhs dense vector elements.
+\param x Values of lhs dense vector elements.
+\param[out] y Values of result dense vector elements.
+\param rows Number of rows in matrix.
+\param elements Number of distinct elements in matrix.
+\param values Distinct values of matrix elements. */
+__kernel void jacobi_iteration(
+	__global const double *preconditioner,
+	__global const uint *row_indices_on_column_indices,
+	__global const uint *row_indices_on_delta_distance_indices,
+	__global const uint *column_indices,
+	__global const uchar *delta_distances,
+	__global const ushort *value_indices,
+#ifdef USE_LOCAL_MEMORY
+	__global const double *global_values,
+#else
+	__global const double *values,
+#endif
+	__global const double *b,
+	__global const double *x,
+	__global double *y,
+#ifdef USE_LOCAL_MEMORY
+	uint rows,
+	uint elements,
+	__local double *values
+	)
+{
+	copy_values(global_values, values, elements);
+#else
+	uint rows)
+{
+#endif
+
+	uint row = get_global_id(0);
+	if (row >= rows) return;
+	
+	// final result: y = x + w * D^-1 * (b - A * x)
+	// y = b - A * x
+	residual_partial(row_indices_on_column_indices, row_indices_on_delta_distance_indices,
+						column_indices, delta_distances, value_indices, values, row, b, x, y);
+	// y = x + w * D^-1 * y
+	y[row] = x[row] + preconditioner[row] * y[row];
+}
+
+
+/** A Gauss-Seidel iteration.
+\param preconditioner The Jacobi preconditioner vector of matrix multiplied with w = 2 / lmax where
+lmax is an upper bound of eigenvalues of matrix.
+\param row_indices_on_column_indices Indices to first block of matrix's each row.
+\param row_indices_on_delta_distance_indices Distance array index of each row's block distances in
+block (elements - 1 in block).
+\param column_indices Column index for the first element of each row's block.
+\param delta_distances Distance between block's elements (0 is 1) - First distance of block is
+actually the number of distances in block (elements - 1 in block).
+\param value_indices The index to a distinct value. They make pairs with \a delta_distances.
+\param global_values Distinct values of matrix elements.
+\param b Values of rhs dense vector elements.
+\param[out] x Values of result dense vector elements.
+\param y Intermediate buffer.
+\param rows Number of rows in matrix.
+\param elements Number of distinct elements in matrix.
+\param values Distinct values of matrix elements. */
+__kernel void gauss_seidel_iteration(
+	__global const double *preconditioner,
+	__global const uint *row_indices_on_column_indices,
+	__global const uint *row_indices_on_delta_distance_indices,
+	__global const uint *column_indices,
+	__global const uchar *delta_distances,
+	__global const ushort *value_indices,
+#ifdef USE_LOCAL_MEMORY
+	__global const double *global_values,
+#else
+	__global const double *values,
+#endif
+	__global const double *b,
+	__global double *x,
+	__global double *y,
+#ifdef USE_LOCAL_MEMORY
+	uint rows,
+	uint elements,
+	__local double *values
+	)
+{
+	copy_values(global_values, values, elements);
+#else
+	uint rows)
+{
+#endif
+
+	uint row = get_global_id(0);
+	if (row >= rows) return;
+	
+	// final result: x += w * D^-1 * (b - A * x)
+	// y = b - A * x
+	residual_partial(row_indices_on_column_indices, row_indices_on_delta_distance_indices,
+						column_indices, delta_distances, value_indices, values, row, b, x, y);
+	// x += w * D^-1 * y
+	x[row] += preconditioner[row] * y[row];
 }

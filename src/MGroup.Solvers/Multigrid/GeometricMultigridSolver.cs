@@ -1,5 +1,4 @@
-﻿using CASS.OpenCL;
-using Compression.src.MGroup.LinearAlgebra.Iterative.Stationary;
+﻿using Compression.src.MGroup.LinearAlgebra.Iterative.Stationary;
 using MGroup.LinearAlgebra.Iterative;
 using MGroup.LinearAlgebra.Iterative.Stationary;
 using MGroup.LinearAlgebra.Iterative.Stationary.CSR;
@@ -8,16 +7,15 @@ using MGroup.LinearAlgebra.Matrices.Builders;
 using MGroup.LinearAlgebra.Triangulation;
 using MGroup.LinearAlgebra.Vectors;
 using System.Diagnostics;
-using System.Xml.Linq;
 
 namespace Compression.src.MGroup.Solvers.Multigrid
 {
     public class GeometricMultigridSolver : IGeometricMultigridSolver
     {
-        public enum MatrixType { CSR, DU_VI }
+        public enum MatrixType { CSR, DUVI }
 
-        private IGeometricMultigridModel Model;
-        private bool GaussSeidel;
+        private readonly IGeometricMultigridModel Model;
+        public readonly bool GaussSeidel;
         private bool[] LevelDown;
         private int[] LevelIterations;
         private int firstLevel;
@@ -28,8 +26,10 @@ namespace Compression.src.MGroup.Solvers.Multigrid
 
         private IMatrixView[] LevelStiffness;
         private LdlSkyline coarseStiffnessLdlFactorized;
-        private CsrMatrix[] restriction;
-        private CsrMatrix[] interpolation;
+        private IMatrixView[] restriction;
+        private IMatrixView[] interpolation;
+
+        private Vector[] RelaxedJacobiPreconditioner;
 
         private const int MaxCircleIterations = 10000;
 
@@ -40,28 +40,32 @@ namespace Compression.src.MGroup.Solvers.Multigrid
 
         public bool IsStepDown(int i) => LevelDown[i];
 
-        public static GeometricMultigridSolver createSimpleV(IGeometricMultigridModel model, bool GaussSeidel = true, MatrixType matType = MatrixType.CSR,
+        public MatrixType MatType => matType;
+        public int TotalLevels => totalLevels;
+        public int NumDofsFree(int level) => LevelStiffness[level].NumRows;
+
+        public static GeometricMultigridSolver CreateSimpleV(IGeometricMultigridModel model, bool GaussSeidel = true, MatrixType matType = MatrixType.CSR,
                                     int maxCircleIterations = MaxCircleIterations, double convergenceTolerance = 1e-6, int fineLevelIterations = 4)
         {
-            GeometricMultigridSolver a = new GeometricMultigridSolver(model, GaussSeidel);
+            GeometricMultigridSolver a = new(model, GaussSeidel);
             a.Initialize(matType, maxCircleIterations, convergenceTolerance, new bool[] { true, false }, new int[] { fineLevelIterations });
             return a;
         }
 
-        public static GeometricMultigridSolver createDeepV(IGeometricMultigridModel model, bool GaussSeidel = true, MatrixType matType = MatrixType.CSR,
+        public static GeometricMultigridSolver CreateDeepV(IGeometricMultigridModel model, bool GaussSeidel = true, MatrixType matType = MatrixType.CSR,
                            int maxCircleIterations = MaxCircleIterations, double convergenceTolerance = 1e-6, int depth = 2, int levelIterations = 4)
         {
-            GeometricMultigridSolver a = new GeometricMultigridSolver(model, GaussSeidel);
+            GeometricMultigridSolver a = new(model, GaussSeidel);
             a.Initialize(matType, maxCircleIterations,
                         convergenceTolerance,
                         Enumerable.Repeat(true, depth).Concat(Enumerable.Repeat(false, depth)).ToArray(), new int[] { levelIterations });
             return a;
         }        
 
-        public static GeometricMultigridSolver createDeepV(IGeometricMultigridModel model, int[] levelIterations, bool GaussSeidel = true, MatrixType matType = MatrixType.CSR,
+        public static GeometricMultigridSolver CreateDeepV(IGeometricMultigridModel model, int[] levelIterations, bool GaussSeidel = true, MatrixType matType = MatrixType.CSR,
                             int maxCircleIterations = MaxCircleIterations, double convergenceTolerance = 1e-6)
         {
-            GeometricMultigridSolver a = new GeometricMultigridSolver(model, GaussSeidel);
+            GeometricMultigridSolver a = new(model, GaussSeidel);
             a.Initialize(matType, maxCircleIterations,
                         convergenceTolerance,
                         Enumerable.Repeat(true, levelIterations.Length / 2).Concat(Enumerable.Repeat(false, levelIterations.Length / 2)).ToArray(), levelIterations);
@@ -70,23 +74,83 @@ namespace Compression.src.MGroup.Solvers.Multigrid
 
         public GeometricMultigridSolver(IGeometricMultigridModel model, bool GS) { Model = model; GaussSeidel = GS; }
 
-        public void Initialize(MatrixType matType, int maxCircleIterations, double convergenceTolerance, bool[] levelDown, int[] levelIterations)
-        {
-            this.matType = matType;
-            LevelDown = levelDown;
-            LevelIterations = levelIterations;
-            MaxIterations = maxCircleIterations;
-            ConvergenceTolerance = convergenceTolerance;
 
+        // calculate with power method -- only for tests -- it is inefficient
+        private double EigenValueUpperBound(DokRowMajor AA)
+        {
+            const double percent = 0.1;
+            CsrMatrix A = AA.ConvertToCsr();
+            Vector x = Vector.CreateWithValue(A.NumRows, 1 / Math.Sqrt(A.NumRows));
+            double l = 1;
+            for (; ; )
+            {
+                Vector y = A.Multiply(x);
+                double l2 = y.Norm2();
+                x = y.Scale(1 / l2);
+                double ratio = l2 / l;
+                l = l2;
+                if (ratio > 1 - percent && ratio < 1 + percent)
+                {
+                    if (ratio > 1) { l *= ratio; break; }
+                    break;
+                }
+            }
+            return l;
+        }
+
+        /// <summary>
+        /// Calculates the Jacobi preconditioner of a sparse matrix.
+        /// </summary>
+        /// <param name="rows">An array of dictionaries column index -> value, one dictionary for each row of matrix.</param>
+        /// <returns>The Jacobi preconditioner which is the inverse of the main diagonal of the matrix.</returns>
+        internal static Vector JacobiPreconditioner(Dictionary<int, double>[] rows)
+        {
+            Vector x = Vector.CreateZero(rows.Length);
+            for (int i = 0; i < rows.Length; ++i)
+                x[i] = 1 / rows[i][i];
+            return x;
+        }
+
+        /// <summary>
+        /// Returns a relatively close upper bound for the eigenvalues of a sparse matrix.
+        /// </summary>
+        /// <remarks>This upper bound is the maximum of the sums of absolute values of rows</remarks>
+        /// <param name="rows">An array of dictionaries column index -> value, one dictionary for each row of matrix.</param>
+        /// <returns>An approximation of the upper bound for the eigenvalues of the given matrix.</returns>
+        internal static double EigenValueUpperBound(Dictionary<int, double>[] rows)
+        {
+            double l = 0;   // max eigenvalue
+            for (int i = 0; i < rows.Length; ++i)
+                l = Math.Max(l, rows[i].Values.Select(v => Math.Abs(v)).Sum()); // approximation of max eigenvalue
+            return l;
+        }
+
+        /// <summary>
+        /// Under or over relaxes the Jacobi preconditioner of a matrix.
+        /// </summary>
+        /// <remarks>Actually it multiplies the jacobi preconditioner with scalar <c>w = 2 / (lmin + lmax)</c>.
+        /// We can assume that <c>lmin = 0</c> as <c>lmax</c> is larger as approximate upper bound.</remarks>
+        /// <param name="x">The Jacobi preconditioner of a matrix, which is the inverse of the main diagonal of the matrix.
+        /// After the call, it is under or over relaxed.</param>
+        /// <param name="l">An approximation of the upper bound for the eigenvalues of the matrix.</param>
+        internal static void RelaxateJacobiPreconditioner(Vector x, double l)
+        {
+            l = 2 / l;
+            for (int i = 0; i < x.Length; ++i)
+                x[i] *= l;
+        }
+        
+        internal static void MakePath(ref int totalLevels, ref bool[] LevelDown, ref int firstLevel)
+        {
             // Make the path
             int currentLevel = 0;
             totalLevels = 1;
-            for (int i = 0; i < levelDown.Length; ++i)
+            for (int i = 0; i < LevelDown.Length; ++i)
             {
-                if (levelDown[i])
-                { 
+                if (LevelDown[i])
+                {
                     ++currentLevel;
-                    if (currentLevel >= totalLevels) totalLevels = currentLevel + 1;
+                    if (currentLevel == totalLevels) ++totalLevels;
                 }
                 else if (currentLevel == 0)
                 {
@@ -99,33 +163,65 @@ namespace Compression.src.MGroup.Solvers.Multigrid
                 LevelDown = LevelDown.Concat(Enumerable.Repeat(false, currentLevel - firstLevel)).ToArray();
             else if (currentLevel < firstLevel)
                 LevelDown = LevelDown.Concat(Enumerable.Repeat(true, firstLevel - currentLevel)).ToArray();
+        }
+
+        internal static LdlSkyline HealJacobiAndCreateLDL(bool expr, DokRowMajor A, Vector[] RelaxedJacobiPreconditioner)
+        {
+            if (expr)
+            {
+                double l = EigenValueUpperBound(A.RawRows); // calculate upper bound of eigenvalues in smaller matrix
+                foreach (var v in RelaxedJacobiPreconditioner)
+                    RelaxateJacobiPreconditioner(v, l);
+            }
+            SkylineMatrix coarseStiffness = SkylineMatrix.CreateFromMatrix(A.BuildCsrMatrix(true).CopyToFullMatrix(), 1e-15);
+            return coarseStiffness.FactorLdl(true, 1e-15);
+        }
+
+        public void Initialize(MatrixType matType, int maxCircleIterations, double convergenceTolerance, bool[] levelDown, int[] levelIterations)
+        {
+            this.matType = matType;
+            LevelDown = levelDown;
+            LevelIterations = levelIterations;
+            MaxIterations = maxCircleIterations;
+            ConvergenceTolerance = convergenceTolerance;
+
+            MakePath(ref totalLevels, ref LevelDown, ref firstLevel);
 
             // Generate coarser models
             LevelStiffness = new IMatrixView[totalLevels - 1];
-            restriction = new CsrMatrix[totalLevels - 1];
-            interpolation = new CsrMatrix[totalLevels - 1];
+            restriction = new IMatrixView[totalLevels - 1];
+            interpolation = new IMatrixView[totalLevels - 1];
+            if (!GaussSeidel) RelaxedJacobiPreconditioner = new Vector[totalLevels - 1];
             (DokRowMajor A, b) = Model.CreateLinearSystem();
             IGeometricMultigridModel currentModel = Model;
             for (int i = 0; i < totalLevels - 1; ++i)
             {
+                //if (!GaussSeidel) HealVector[i] = HealStiffnessMatrix(A.RawRows);
+                if (!GaussSeidel) RelaxedJacobiPreconditioner[i] = JacobiPreconditioner(A.RawRows);
                 (currentModel, DokRowMajor restrictionB, DokRowMajor interpolationB) = currentModel.CreateCoarserModelAndSmoothenerMatrices();
                 switch(matType)
                 {
-                    case MatrixType.CSR: LevelStiffness[i] = A.BuildCsrMatrix(true); break;
-                    case MatrixType.DU_VI: LevelStiffness[i] = new DuViCompressedSparseMatrix(A); break;
+                    case MatrixType.CSR:
+                        LevelStiffness[i] = A.BuildCsrMatrix(true);
+                        restriction[i] = restrictionB.BuildCsrMatrix(true);
+                        interpolation[i] = interpolationB.BuildCsrMatrix(true);
+                        break;
+                    case MatrixType.DUVI:
+                        LevelStiffness[i] = new DuViCompressedSparseMatrix(A);
+                        restriction[i] = new DuViCompressedSparseMatrix(restrictionB);
+                        interpolation[i] = new DuViCompressedSparseMatrix(interpolationB);
+                        break;
                 }
-                restriction[i] = restrictionB.BuildCsrMatrix(true);
-                interpolation[i] = interpolationB.BuildCsrMatrix(true);
                 (A, _) = currentModel.CreateLinearSystem();
             }
-            SkylineMatrix coarseStiffness = SkylineMatrix.CreateFromMatrix(A.BuildCsrMatrix(true).CopyToFullMatrix(), 1e-15);
-            coarseStiffnessLdlFactorized = coarseStiffness.FactorLdl(true, 1e-15);
+            coarseStiffnessLdlFactorized = HealJacobiAndCreateLDL(!GaussSeidel, A, RelaxedJacobiPreconditioner);
 
 #if DEBUG
             //OutputMatrix(LevelStiffness);
             File.Delete(GetLogPath());
 #endif
         }
+
         private static void OutputMatrix(IMatrixView[] A)
         {
 #if DEBUG
@@ -147,16 +243,11 @@ namespace Compression.src.MGroup.Solvers.Multigrid
 #endif
         }
 
+        private string GetLogPath() => GetLogPath(matType == MatrixType.DUVI, GaussSeidel, false);
+        internal static string GetLogPath(bool duvi, bool gaussSeidel, bool gpu)
+            => "output_" + (duvi ? "duvi" : "csr") + "_" + (gaussSeidel ? "gauss_seidel" : "jacobi") + "_" + (gpu ? "g" : "c") + "pu.txt";
 
-        private string GetLogPath() => "output_" + (matType == MatrixType.CSR ? "csr_" : "duvi_") + (GaussSeidel ? "gauss_seidel" : "jacobi") + "_cpu.txt";
-
-        private void OutputVectorX(int currentLevel, Vector[] x, string name)
-        {
-#if DEBUG
-            OutputVectorX(currentLevel, x[currentLevel], name);
-#endif
-        }
-
+        private void OutputVectorX(int currentLevel, Vector[] x, string name) => OutputVectorX(currentLevel, x[currentLevel], name);
         private void OutputVectorX(int currentLevel, Vector x, string name)
         {
 #if DEBUG
@@ -167,13 +258,15 @@ namespace Compression.src.MGroup.Solvers.Multigrid
 
         public (IterativeStatistics, double[]) Solve(Vector? xInitialGuess)
         {
-            IStationaryIteration[] stationaryIteration = new IStationaryIteration[totalLevels - 1];
-            for (int i = 0; i < stationaryIteration.Length; ++i)
+            IStationaryIteration[] stationaryIteration = null;
+            if (GaussSeidel)
             {
-                stationaryIteration[i] = matType == MatrixType.CSR
-                    ? GaussSeidel ? new GaussSeidelIterationCsr() : new JacobiIterationCsr()
-                    : GaussSeidel ? new GaussSeidelIterationCsrDuVi() : new GaussSeidelIterationCsrDuVi(); //TODO: needs implementation of Jacobi for DuVi matrices
-                stationaryIteration[i].UpdateMatrix(LevelStiffness[i], false);
+                stationaryIteration = new IStationaryIteration[totalLevels - 1];
+                for (int i = 0; i < stationaryIteration.Length; ++i)
+                {
+                    stationaryIteration[i] = matType == MatrixType.CSR ? new GaussSeidelIterationCsr() : new GaussSeidelIterationCsrDuVi();
+                    stationaryIteration[i].UpdateMatrix(LevelStiffness[i], false);
+                }
             }
 
             Vector[] x = new Vector[totalLevels - 1];
@@ -183,10 +276,10 @@ namespace Compression.src.MGroup.Solvers.Multigrid
             r[0] = b;
             // if first level is not 0
             for (int i = 0; i < firstLevel; ++i)
-                r[i + 1] = restriction[i].Multiply(r[i]);
+                r[i + 1] = (Vector) restriction[i].Multiply(r[i]);
 
             double[] time = new double[totalLevels];
-            Stopwatch stopwatch = new Stopwatch();
+            Stopwatch stopwatch = new();
 
             // loop of cycles
             for (int iterations = 0; ; ++iterations)
@@ -204,23 +297,27 @@ namespace Compression.src.MGroup.Solvers.Multigrid
                         OutputVectorX(currentLevel, r, "B");
                         Vector eCoarse = coarseStiffnessLdlFactorized.SolveLinearSystem(r[currentLevel]);
                         OutputVectorX(currentLevel, eCoarse, "X");
-                        Vector eFine = interpolation.Last().Multiply(eCoarse);
+                        Vector eFine = (Vector) interpolation.Last().Multiply(eCoarse);
                         x[currentLevel - 1].AddIntoThis(eFine);
                         OutputVectorX(currentLevel - 1, x, "X");
                     }
                     else
                     {
-                        //TODO: remove me
-                        if (currentLevel == 1 && !LevelDown[step]) OutputVectorX(currentLevel, r, "b");
-
-
                         // try to solve A * xInitialGuess = b
                         int lvlIter = LevelIterations[Math.Min(currentLevel, LevelIterations.Length - 1)];
                         for (int i = 0; i < lvlIter; ++i)
                         {
-                            //TODO: remove me
-                            if (currentLevel == 1 && !LevelDown[step]) OutputVectorX(currentLevel, x, "x");
-                            stationaryIteration[currentLevel].Execute(r[currentLevel], x[currentLevel]);
+                            if (GaussSeidel)
+                                stationaryIteration[currentLevel].Execute(r[currentLevel], x[currentLevel]);
+                            else
+                            {
+                                // x += w * D^-1 * (b - A * x)
+                                IVector res = Vector.CreateZero(x[currentLevel].Length);
+                                LevelStiffness[currentLevel].MultiplyIntoResult(x[currentLevel], res);
+                                res.SubtractIntoThis(r[currentLevel]);
+                                for (int j = 0; j < res.Length; ++j)
+                                    x[currentLevel][j] -= res[j] * RelaxedJacobiPreconditioner[currentLevel][j];
+                            }
                         }
                         if (currentLevel == 1 && !LevelDown[step]) OutputVectorX(currentLevel, x, "x");
 
@@ -244,10 +341,12 @@ namespace Compression.src.MGroup.Solvers.Multigrid
                                 double residual = rFine.Norm2();
                                 if (converged || failed || iterations > MaxIterations)
                                 {
-                                    IterativeStatistics stats = new IterativeStatistics();
-                                    stats.NumIterationsRequired = iterations;
-                                    stats.ConvergenceCriterion = ("dumb text", residual);
-                                    stats.HasConverged = converged;
+                                    IterativeStatistics stats = new()
+                                    {
+                                        NumIterationsRequired = iterations,
+                                        ConvergenceCriterion = ("dumb text", residual),
+                                        HasConverged = converged
+                                    };
                                     return (stats, time);
                                 }
                             }
@@ -257,13 +356,13 @@ namespace Compression.src.MGroup.Solvers.Multigrid
                             OutputVectorX(currentLevel, rFine, "R");
 
                             // fine residual to coarse residual
-                            r[currentLevel + 1] = restriction[currentLevel].Multiply(rFine);
+                            r[currentLevel + 1] = (Vector) restriction[currentLevel].Multiply(rFine);
                             if (currentLevel < totalLevels - 2)
                                 x[currentLevel + 1] = Vector.CreateZero(r[currentLevel + 1].Length);
                         }
                         else
                         {
-                            Vector eFine = interpolation[currentLevel - 1].Multiply(x[currentLevel]);
+                            Vector eFine = (Vector) interpolation[currentLevel - 1].Multiply(x[currentLevel]);
                             x[currentLevel - 1].AddIntoThis(eFine);
 
                             OutputVectorX(currentLevel, x, "X");

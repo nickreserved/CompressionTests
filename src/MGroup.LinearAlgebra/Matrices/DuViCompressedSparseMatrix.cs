@@ -88,7 +88,7 @@ namespace MGroup.LinearAlgebra.Matrices
 				}
 			}
 			public enum DeltaBytes { one, two, four, eight };
-			private byte[] data;
+			private readonly byte[] data;
 
 			/// <summary>
 			/// This is the first unit in matrix row. So first element of the unit is first element of the row.
@@ -155,8 +155,8 @@ namespace MGroup.LinearAlgebra.Matrices
 		public int NumColumns { get; }
 		public int NumRows { get; }
 
-        private double[] uniqueValues;
-        private int[] valueIndices;
+        private readonly double[] uniqueValues;
+        private readonly int[] valueIndices;
 		public Unit[] units;
 
 		/// <summary>
@@ -180,9 +180,9 @@ namespace MGroup.LinearAlgebra.Matrices
 
 			Dictionary<double, int> map = tolerance > 0 ? new Dictionary<double, int>(new ToleranceComparer(tolerance))
 														: new Dictionary<double, int>();
-			List<Unit> units = new List<Unit>();
-			List<int> valueIndices = new List<int>();
-			List<double> uniqueValues = new List<double>();
+			List<Unit> units = new();
+			List<int> valueIndices = new();
+			List<double> uniqueValues = new();
 
 			// find the units with the same integer type of delta (uint8, uint16, uint32)
 			for (int y = 0, indexIn = 0; y < height; ++y)
@@ -212,7 +212,7 @@ namespace MGroup.LinearAlgebra.Matrices
 						break;
 					}
 				}
-				List<int> deltaCols = new List<int>();
+				List<int> deltaCols = new();
 				for (; x < width; ++x)
 				{
 					double v = values[indexIn++];
@@ -289,9 +289,9 @@ namespace MGroup.LinearAlgebra.Matrices
 
 			Dictionary<double, int> map = tolerance > 0 ? new Dictionary<double, int>(new ToleranceComparer(tolerance))
 														: new Dictionary<double, int>();
-			List<Unit> units = new List<Unit>();
-			List<int> valueIndices = new List<int>();
-			List<double> uniqueValues = new List<double>();
+			List<Unit> units = new();
+			List<int> valueIndices = new();
+			List<double> uniqueValues = new();
 
 			// find the units with the same integer type of delta (uint8, uint16, uint32)
 			for (int y = 0; y < height; ++y)
@@ -313,7 +313,7 @@ namespace MGroup.LinearAlgebra.Matrices
 
                     // index storage
                     // at least one unit per row because it signs "new row"
-                    units.Add(new Unit(true, Unit.DeltaBytes.one, 0, new int[0]));
+                    units.Add(new Unit(true, Unit.DeltaBytes.one, 0, Array.Empty<int>()));
                     continue;
 				}
 
@@ -333,7 +333,7 @@ namespace MGroup.LinearAlgebra.Matrices
 					map[v] = map.Count;
 				}
 
-				List<int> deltaCols = new List<int>();
+				List<int> deltaCols = new();
 				for (int idx = rowIndex + 1; idx < rowIndices[y + 1]; ++idx)
 				{
 					v = values[idx];
@@ -405,7 +405,7 @@ namespace MGroup.LinearAlgebra.Matrices
 			NumRows = height; NumColumns = width;
 			uniqueValues = new double[1];   //     0 by def
 			valueIndices = new int[height]; // all 0 by def
-			Unit u = new Unit(true, Unit.DeltaBytes.one, 0, new int[0]);
+			Unit u = new(true, Unit.DeltaBytes.one, 0, Array.Empty<int>());
 			units = new Unit[height];
 			for (int i = 0; i < units.Length; ++i)
 				units[i] = u;

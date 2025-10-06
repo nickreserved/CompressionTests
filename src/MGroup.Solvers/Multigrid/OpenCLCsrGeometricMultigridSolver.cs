@@ -8,7 +8,6 @@ using MGroup.LinearAlgebra.Triangulation;
 using MGroup.LinearAlgebra.Vectors;
 using MGroup.OCL;
 using System.Diagnostics;
-using System.IO;
 
 namespace Compression.src.MGroup.Solvers.Multigrid
 {
@@ -34,7 +33,7 @@ namespace Compression.src.MGroup.Solvers.Multigrid
 
         private CLCommandQueue commandQueue;
 
-        private CLMem[] bufferOfRowOffsets, bufferOfColumnIndices, bufferOfValues, bufferOfVectorB, bufferOfVectorX;
+        private CLMem[] bufferOfPrecond, bufferOfRowOffsets, bufferOfColumnIndices, bufferOfValues, bufferOfVectorB, bufferOfVectorX;
         private CLMem bufferOfVectorR, bufferOfZero;
 
         private const int MaxCircleIterations = 10000;
@@ -104,6 +103,8 @@ namespace Compression.src.MGroup.Solvers.Multigrid
             ConvergenceTolerance = convergenceTolerance;
         }
 
+
+
         /// <summary>
         /// Initialize Geometric Multigrid solver
         /// </summary>
@@ -114,31 +115,11 @@ namespace Compression.src.MGroup.Solvers.Multigrid
             // device specific things
             uint LocalWorkgroupSize = Math.Min(device.workgroupSizeMax, (uint)device.workItemSizes[0]);
 
-            // Make the path
-            int currentLevel = 0;
-            totalLevels = 1;
-            for (int i = 0; i < LevelDown.Length; ++i)
-            {
-                if (LevelDown[i])
-                {
-                    ++currentLevel;
-                    if (currentLevel == totalLevels) ++totalLevels;
-                }
-                else if (currentLevel == 0)
-                {
-                    ++firstLevel;
-                    ++totalLevels;
-                }
-                else --currentLevel;
-            }
-            if (currentLevel > firstLevel)
-                LevelDown = LevelDown.Concat(Enumerable.Repeat(false, currentLevel - firstLevel)).ToArray();
-            else if (currentLevel < firstLevel)
-                LevelDown = LevelDown.Concat(Enumerable.Repeat(true, firstLevel - currentLevel)).ToArray();
-
+            GeometricMultigridSolver.MakePath(ref totalLevels, ref LevelDown, ref firstLevel);
 
             // Generate coarser models
             CsrMatrix[] mat = new CsrMatrix[(totalLevels - 1) * 3];
+            Vector[] preconditioners = new Vector[totalLevels - 1];
             GlobalWorkSize = new SizeT[totalLevels][];
             LocalWorkSize = new SizeT[totalLevels][];
             LevelDoFs = new int[totalLevels];
@@ -148,13 +129,13 @@ namespace Compression.src.MGroup.Solvers.Multigrid
             {
                 (model, DokRowMajor restrictionB, DokRowMajor interpolationB) = model.CreateCoarserModelAndSmoothenerMatrices();
                 LevelDoFs[i + 1] = restrictionB.NumRows;
+                preconditioners[i] = GeometricMultigridSolver.JacobiPreconditioner(A.RawRows);
                 mat[3 * i + 0] = A.BuildCsrMatrix(true);                // Stiffness
                 mat[3 * i + 1] = restrictionB.BuildCsrMatrix(true);     // Restriction
                 mat[3 * i + 2] = interpolationB.BuildCsrMatrix(true);   // Interpolation
                 (A, _) = model.CreateLinearSystem();
             }
-            SkylineMatrix coarseStiffness = SkylineMatrix.CreateFromMatrix(A.BuildCsrMatrix(true).CopyToFullMatrix(), 1e-15);
-            coarseStiffnessLdlFactorized = coarseStiffness.FactorLdl(true, 1e-15);
+            coarseStiffnessLdlFactorized = GeometricMultigridSolver.HealJacobiAndCreateLDL(true, A, preconditioners);
 
             CalculateWorkgroupSizes(LevelDoFs, LocalWorkgroupSize, false, GlobalWorkSize, LocalWorkSize);
 
@@ -188,12 +169,15 @@ namespace Compression.src.MGroup.Solvers.Multigrid
             // ...for vectors
             bufferOfVectorB = new CLMem[totalLevels];
             bufferOfVectorX = new CLMem[totalLevels - 1];
+            bufferOfPrecond = new CLMem[totalLevels - 1];
             bufferOfVectorR = context.CreateBuffer(CLMemFlags.ReadWrite, mat[0].NumRows * sizeof(double));
             for (int i = 0; i < totalLevels - 1; ++i)
             {
                 int total = mat[3 * i].NumRows * sizeof(double);
                 bufferOfVectorB[i] = context.CreateBuffer(i == 0 ? CLMemFlags.ReadOnly : CLMemFlags.ReadWrite, total);
                 bufferOfVectorX[i] = context.CreateBuffer(                               CLMemFlags.ReadWrite, total);
+                bufferOfPrecond[i] = context.CreateBuffer(                               CLMemFlags.ReadOnly, total);
+                context.WriteBuffer(commandQueue, bufferOfPrecond[i], CLBool.True, 0, total, preconditioners[i].RawData);
             }
             bufferOfVectorB[totalLevels - 1] = context.CreateBuffer(CLMemFlags.ReadWrite, mat[3 * totalLevels - 5].NumRows * sizeof(double));
             context.WriteBuffer(commandQueue, bufferOfVectorB[0], CLBool.True, 0, b.RawData.Length * sizeof(double), b.RawData);
@@ -211,27 +195,28 @@ namespace Compression.src.MGroup.Solvers.Multigrid
             // What is commented out, takes different params while algorithm executed.
             // This happens on solve()
 
-            //context.SetKernelArg(kernelJacobiInitial, 0, bufferOfRowOffsets   [3 * currentLevel]);
-            //context.SetKernelArg(kernelJacobiInitial, 1, bufferOfColumnIndices[3 * currentLevel]);
-            //context.SetKernelArg(kernelJacobiInitial, 2, bufferOfValues       [3 * currentLevel]);
-            //context.SetKernelArg(kernelJacobiInitial, 3, bufferOfVectorB[currentLevel]);
-            context.SetKernelArg(kernelJacobiInitial, 4, bufferOfVectorR);
-            //context.SetKernelArg(kernelJacobiInitial, 5, LevelDoFs                [currentLevel]);
+            //context.SetKernelArg(kernelJacobiInitial, 0, bufferOfPrecond[currentLevel]);
+            //context.SetKernelArg(kernelJacobiInitial, 1, bufferOfVectorB[currentLevel]);
+            context.SetKernelArg(kernelJacobiInitial, 2, bufferOfVectorR);
+            //context.SetKernelArg(kernelJacobiInitial, 3, LevelDoFs      [currentLevel]);
 
-            //context.SetKernelArg(kernelJacobi, 0, bufferOfRowOffsets   [3 * currentLevel]);
-            //context.SetKernelArg(kernelJacobi, 1, bufferOfColumnIndices[3 * currentLevel]);
-            //context.SetKernelArg(kernelJacobi, 2, bufferOfValues       [3 * currentLevel]);
-            //context.SetKernelArg(kernelJacobi, 3, bufferOfVectorB          [currentLevel]);
-            //context.SetKernelArg(kernelJacobi, 4, bufferOfVectorX[currentLevel] OR bufferOfVectorR);
-            //context.SetKernelArg(kernelJacobi, 5, bufferOfVectorR               OR bufferOfVectorX[currentLevel]);
-            //context.SetKernelArg(kernelJacobi, 6, LevelDoFs                [currentLevel]);
+            //context.SetKernelArg(kernelJacobi, 0, bufferOfPrecond          [currentLevel]);
+            //context.SetKernelArg(kernelJacobi, 1, bufferOfRowOffsets   [3 * currentLevel]);
+            //context.SetKernelArg(kernelJacobi, 2, bufferOfColumnIndices[3 * currentLevel]);
+            //context.SetKernelArg(kernelJacobi, 3, bufferOfValues       [3 * currentLevel]);
+            //context.SetKernelArg(kernelJacobi, 4, bufferOfVectorB          [currentLevel]);
+            //context.SetKernelArg(kernelJacobi, 5, bufferOfVectorX[currentLevel] OR bufferOfVectorR);
+            //context.SetKernelArg(kernelJacobi, 6, bufferOfVectorR               OR bufferOfVectorX[currentLevel]);
+            //context.SetKernelArg(kernelJacobi, 7, LevelDoFs                [currentLevel]);
 
-            //context.SetKernelArg(kernelGaussSeidel, 0, bufferOfRowOffsets   [3 * currentLevel]);
-            //context.SetKernelArg(kernelGaussSeidel, 1, bufferOfColumnIndices[3 * currentLevel]);
-            //context.SetKernelArg(kernelGaussSeidel, 2, bufferOfValues       [3 * currentLevel]);
-            //context.SetKernelArg(kernelGaussSeidel, 3, bufferOfVectorB[currentLevel]);
-            //context.SetKernelArg(kernelGaussSeidel, 4, bufferOfVectorX[currentLevel]);
-            //context.SetKernelArg(kernelGaussSeidel, 5, LevelDoFs                [currentLevel]);
+            //context.SetKernelArg(kernelGaussSeidel, 0, bufferOfPrecond          [currentLevel]);
+            //context.SetKernelArg(kernelGaussSeidel, 1, bufferOfRowOffsets   [3 * currentLevel]);
+            //context.SetKernelArg(kernelGaussSeidel, 2, bufferOfColumnIndices[3 * currentLevel]);
+            //context.SetKernelArg(kernelGaussSeidel, 3, bufferOfValues       [3 * currentLevel]);
+            //context.SetKernelArg(kernelGaussSeidel, 4, bufferOfVectorB          [currentLevel]);
+            //context.SetKernelArg(kernelGaussSeidel, 5, bufferOfVectorX          [currentLevel]);
+            context.SetKernelArg(kernelGaussSeidel, 6, bufferOfVectorR);
+            //context.SetKernelArg(kernelGaussSeidel, 7, LevelDoFs                [currentLevel]);
 
             //context.SetKernelArg(kernelMatrixVectorProduct, 0, bufferOfRowOffsets   [3 * currentLevel] OR bufferOfRowOffsets   [3 * currentLevel + 1] OR bufferOfRowOffsets   [3 * currentLevel - 1] OR bufferOfRowOffsets   [3 * currentLevel - 1]);
             //context.SetKernelArg(kernelMatrixVectorProduct, 1, bufferOfColumnIndices[3 * currentLevel] OR bufferOfColumnIndices[3 * currentLevel + 1] OR bufferOfColumnIndices[3 * currentLevel - 1] OR bufferOfColumnIndices[3 * currentLevel - 1]);
@@ -261,7 +246,7 @@ namespace Compression.src.MGroup.Solvers.Multigrid
 
             #if DEBUG
             //OutputMatrix(mat);
-            File.Delete(GetLogPath());
+            File.Delete(GeometricMultigridSolver.GetLogPath(false, GaussSeidel, true));
             #endif
         }
 
@@ -290,22 +275,19 @@ namespace Compression.src.MGroup.Solvers.Multigrid
             #endif
         }
 
-        private string GetLogPath() => "output_csr_" + (GaussSeidel ? "gauss_seidel" : "jacobi") + "_gpu.txt";
-
         private void OutputVectorX(int currentLevel, CLMem[] bufferOfVector, string name)
-        {
-            #if DEBUG
-            OutputVectorX(currentLevel, bufferOfVector[currentLevel], name);
-            #endif
-        }
-
+            => OutputVectorX(currentLevel, bufferOfVector[currentLevel], name);
         private void OutputVectorX(int currentLevel, CLMem bufferOfVector, string name)
+            => OutputVectorX(currentLevel, bufferOfVector, name, false, context, commandQueue, GaussSeidel, LevelDoFs);
+
+        internal static void OutputVectorX(int currentLevel, CLMem bufferOfVector, string name,
+            bool duvi, OpenCL context, CLCommandQueue commandQueue, bool GaussSeidel, int[] LevelDoFs)
         {
             #if DEBUG
             Vector x = Vector.CreateZero(LevelDoFs[currentLevel]);
             context.ReadBuffer(commandQueue, bufferOfVector, CLBool.True, 0, x.Length * sizeof(double), x.RawData);
             string line = name + "(" + currentLevel + ") = [" + string.Join(" ", x.RawData.Select(e => e.ToString("G14"))) + "]" + Environment.NewLine;
-            File.AppendAllText(GetLogPath(), line);
+            File.AppendAllText(GeometricMultigridSolver.GetLogPath(duvi, GaussSeidel, true), line);
             #endif
         }
 
@@ -382,12 +364,14 @@ namespace Compression.src.MGroup.Solvers.Multigrid
                                 context.FillBuffer(commandQueue, bufferOfVectorX[currentLevel], 0, LevelDoFs[currentLevel] * sizeof(double), 0.0);
 
                             // Gauss-Seidel non-changed-per-iteration parameters
-                            context.SetKernelArg(kernelGaussSeidel, 0, bufferOfRowOffsets   [3 * currentLevel]);
-                            context.SetKernelArg(kernelGaussSeidel, 1, bufferOfColumnIndices[3 * currentLevel]);
-                            context.SetKernelArg(kernelGaussSeidel, 2, bufferOfValues       [3 * currentLevel]);
-                            context.SetKernelArg(kernelGaussSeidel, 3, bufferOfVectorB          [currentLevel]);
-                            context.SetKernelArg(kernelGaussSeidel, 4, bufferOfVectorX          [currentLevel]);
-                            context.SetKernelArg(kernelGaussSeidel, 5, LevelDoFs                [currentLevel]);
+                            context.SetKernelArg(kernelGaussSeidel, 0, bufferOfPrecond          [currentLevel]);
+                            context.SetKernelArg(kernelGaussSeidel, 1, bufferOfRowOffsets   [3 * currentLevel]);
+                            context.SetKernelArg(kernelGaussSeidel, 2, bufferOfColumnIndices[3 * currentLevel]);
+                            context.SetKernelArg(kernelGaussSeidel, 3, bufferOfValues       [3 * currentLevel]);
+                            context.SetKernelArg(kernelGaussSeidel, 4, bufferOfVectorB          [currentLevel]);
+                            context.SetKernelArg(kernelGaussSeidel, 5, bufferOfVectorX          [currentLevel]);
+                            //context.SetKernelArg(kernelGaussSeidel, 6, bufferOfVectorR);
+                            context.SetKernelArg(kernelGaussSeidel, 7, LevelDoFs                [currentLevel]);
 
                             // Gauss-Seidel iterations
                             for (int i = 0; i < lvlIter; ++i)
@@ -398,60 +382,46 @@ namespace Compression.src.MGroup.Solvers.Multigrid
                             int i;  // how many Jacobi iterations happen until now
 
                             // normal Jacobi non-changed-per-iteration parameters
-                            context.SetKernelArg(kernelJacobi, 0, bufferOfRowOffsets[3 * currentLevel]);
-                            context.SetKernelArg(kernelJacobi, 1, bufferOfColumnIndices[3 * currentLevel]);
-                            context.SetKernelArg(kernelJacobi, 2, bufferOfValues[3 * currentLevel]);
-                            context.SetKernelArg(kernelJacobi, 3, bufferOfVectorB[currentLevel]);
-                            // 4 and 5 below
-                            context.SetKernelArg(kernelJacobi, 6, LevelDoFs[currentLevel]);
+                            context.SetKernelArg(kernelJacobi, 0, bufferOfPrecond          [currentLevel]);
+                            context.SetKernelArg(kernelJacobi, 1, bufferOfRowOffsets   [3 * currentLevel]);
+                            context.SetKernelArg(kernelJacobi, 2, bufferOfColumnIndices[3 * currentLevel]);
+                            context.SetKernelArg(kernelJacobi, 3, bufferOfValues       [3 * currentLevel]);
+                            context.SetKernelArg(kernelJacobi, 4, bufferOfVectorB          [currentLevel]);
+                            // 5 and 6 below
+                            context.SetKernelArg(kernelJacobi, 7, LevelDoFs                [currentLevel]);
 
                             // First 2 Jacobi iterations if initial X = 0
                             bool ld = step == 0 ? LevelDown.Last() : LevelDown[step - 1];
                             if (currentLevel == 0 && xInitialGuess == null || currentLevel != 0 && ld)
                             {
                                 // initial Jacobi implies initial X = 0. Result as X is R : PING!
-                                context.SetKernelArg(kernelJacobiInitial, 0, bufferOfRowOffsets   [3 * currentLevel]);
-                                context.SetKernelArg(kernelJacobiInitial, 1, bufferOfColumnIndices[3 * currentLevel]);
-                                context.SetKernelArg(kernelJacobiInitial, 2, bufferOfValues       [3 * currentLevel]);
-                                context.SetKernelArg(kernelJacobiInitial, 3, bufferOfVectorB          [currentLevel]);
-                                context.SetKernelArg(kernelJacobiInitial, 4, bufferOfVectorR);
-                                context.SetKernelArg(kernelJacobiInitial, 5, LevelDoFs                [currentLevel]);
+                                context.SetKernelArg(kernelJacobiInitial, 0, bufferOfPrecond[currentLevel]);
+                                context.SetKernelArg(kernelJacobiInitial, 1, bufferOfVectorB[currentLevel]);
+                                //context.SetKernelArg(kernelJacobiInitial, 2, bufferOfVectorR);
+                                context.SetKernelArg(kernelJacobiInitial, 3, LevelDoFs      [currentLevel]);
                                 context.NDRangeKernel(commandQueue, kernelJacobiInitial, 1, null, GlobalWorkSize[currentLevel], LocalWorkSize[currentLevel]);
 
                                 // normal Jacobi has R as initial X. Result as X is X : PONG!
-                                context.SetKernelArg(kernelJacobi, 4, bufferOfVectorR);
-                                context.SetKernelArg(kernelJacobi, 5, bufferOfVectorX[currentLevel]);
+                                context.SetKernelArg(kernelJacobi, 5, bufferOfVectorR);
+                                context.SetKernelArg(kernelJacobi, 6, bufferOfVectorX[currentLevel]);
                                 context.NDRangeKernel(commandQueue, kernelJacobi, 1, null, GlobalWorkSize[currentLevel], LocalWorkSize[currentLevel]);
 
                                 i = 2;
                             }
                             else i = 0;
 
-
-                            //TODO: remove me
-                            if (currentLevel == 1 && !LevelDown[step])
-                                OutputVectorX(currentLevel, bufferOfVectorB, "b");
-
-
-
                             // Rest of jacobi iterations (or all Jacobi iterations if initial X != 0)
                             for (; i < lvlIter; i += 2) // do not change < to !=
                             {
-                                //TODO: remove me
-                                if (currentLevel == 1 && !LevelDown[step]) OutputVectorX(currentLevel, bufferOfVectorX, "x");
                                 // normal Jacobi has X as initial X. Result as X is R : PING!
-                                context.SetKernelArg(kernelJacobi, 4, bufferOfVectorX[currentLevel]);
-                                context.SetKernelArg(kernelJacobi, 5, bufferOfVectorR);
-                                context.NDRangeKernel(commandQueue, kernelJacobi, 1, null, GlobalWorkSize[currentLevel], LocalWorkSize[currentLevel]);
-                                //TODO: remove me
-                                if (currentLevel == 1 && !LevelDown[step]) OutputVectorX(currentLevel, bufferOfVectorR, "x");
-                                // normal Jacobi has R as initial X. Result as X is X : PONG!
-                                context.SetKernelArg(kernelJacobi, 4, bufferOfVectorR);
                                 context.SetKernelArg(kernelJacobi, 5, bufferOfVectorX[currentLevel]);
+                                context.SetKernelArg(kernelJacobi, 6, bufferOfVectorR);
+                                context.NDRangeKernel(commandQueue, kernelJacobi, 1, null, GlobalWorkSize[currentLevel], LocalWorkSize[currentLevel]);
+                                // normal Jacobi has R as initial X. Result as X is X : PONG!
+                                context.SetKernelArg(kernelJacobi, 5, bufferOfVectorR);
+                                context.SetKernelArg(kernelJacobi, 6, bufferOfVectorX[currentLevel]);
                                 context.NDRangeKernel(commandQueue, kernelJacobi, 1, null, GlobalWorkSize[currentLevel], LocalWorkSize[currentLevel]);
                             }
-                            //TODO: remove me
-                            if (currentLevel == 1 && !LevelDown[step]) OutputVectorX(currentLevel, bufferOfVectorX, "x");
                         }
 
                         if (LevelDown[step])
