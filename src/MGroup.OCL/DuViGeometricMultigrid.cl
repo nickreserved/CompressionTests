@@ -256,7 +256,11 @@ void matrix_vector_product_partial(
 	__global const uint *column_indices,
 	__global const uchar *delta_distances,
 	__global const ushort *value_indices,
+#ifdef USE_LOCAL_MEMORY
 	__local const double *values,
+#else
+	__global const double *values,
+#endif
 	uint row,
 	__global const double *x,
 	__global double *y,
@@ -364,7 +368,11 @@ void residual_partial(
 	__global const uint *column_indices,
 	__global const uchar *delta_distances,
 	__global const ushort *value_indices,
+#ifdef USE_LOCAL_MEMORY
 	__local const double *values,
+#else
+	__global const double *values,
+#endif
 	uint row,
 	__global const double *b,
 	__global const double *x,

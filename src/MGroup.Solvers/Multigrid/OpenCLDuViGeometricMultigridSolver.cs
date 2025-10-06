@@ -192,8 +192,8 @@ namespace Compression.src.MGroup.Solvers.Multigrid
             kernelResidualWithCheck = new CLKernel[2];
             kernelMatrixVectorProduct = new CLKernel[2];
 
-            program[0] = Program.CreateProgram(context, "DuViGeometricMultigridLocal", "-cl-std=CL2.0");
-            program[1] = Program.CreateProgram(context, "DuViGeometricMultigridLocal", "-cl-std=CL2.0 -DUSE_LOCAL_MEM");
+            program[0] = Program.CreateProgram(context, "DuViGeometricMultigrid", "-cl-std=CL2.0");
+            program[1] = Program.CreateProgram(context, "DuViGeometricMultigrid", "-cl-std=CL2.0 -DUSE_LOCAL_MEM");
             //program[1] = program[0];
 
             for (int i = 0; i < 2; ++i)
