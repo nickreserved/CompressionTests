@@ -106,6 +106,48 @@ namespace Compression.src.MGroup.Solvers.Multigrid
 
 
         /// <summary>
+        /// Calculates the Jacobi preconditioner of a sparse matrix.
+        /// </summary>
+        /// <param name="rows">An array of dictionaries column index -> value, one dictionary for each row of matrix.</param>
+        /// <returns>The Jacobi preconditioner which is the inverse of the main diagonal of the matrix.</returns>
+        private Vector JacobiPreconditioner(Dictionary<int, double>[] rows)
+        {
+            Vector x = Vector.CreateZero(rows.Length);
+            for (int i = 0; i < rows.Length; ++i)
+                x[i] = 1 / rows[i][i];
+            return x;
+        }
+
+        /// <summary>
+        /// Returns a relatively close upper bound for the eigenvalues of a sparse matrix.
+        /// </summary>
+        /// <remarks>This upper bound is the maximum of the sums of absolute values of rows</remarks>
+        /// <param name="rows">An array of dictionaries column index -> value, one dictionary for each row of matrix.</param>
+        /// <returns>An approximation of the upper bound for the eigenvalues of the given matrix.</returns>
+        private double EigenValueUpperBound(Dictionary<int, double>[] rows)
+        {
+            double l = 0;   // max eigenvalue
+            for (int i = 0; i < rows.Length; ++i)
+                l = Math.Max(l, rows[i].Values.Select(v => Math.Abs(v)).Sum()); // approximation of max eigenvalue
+            return l;
+        }
+
+        /// <summary>
+        /// Under or over relaxes the Jacobi preconditioner of a matrix.
+        /// </summary>
+        /// <remarks>Actually it multiplies the jacobi preconditioner with scalar <c>w = 2 / (lmin + lmax)</c>.
+        /// We can assume that <c>lmin = 0</c> as <c>lmax</c> is larger as approximate upper bound.</remarks>
+        /// <param name="x">The Jacobi preconditioner of a matrix, which is the inverse of the main diagonal of the matrix.
+        /// After the call, it is under or over relaxed.</param>
+        /// <param name="l">An approximation of the upper bound for the eigenvalues of the matrix.</param>
+        private void RelaxateJacobiPreconditioner(Vector x, double l)
+        {
+            l = 2 / l;
+            for (int i = 0; i < x.Length; ++i)
+                x[i] *= l;
+        }
+        
+        /// <summary>
         /// Initialize Geometric Multigrid solver
         /// </summary>
         /// <param name="device">OpenCL device.</param>

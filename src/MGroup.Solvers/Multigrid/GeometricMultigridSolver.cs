@@ -1,4 +1,5 @@
 ﻿using Compression.src.MGroup.LinearAlgebra.Iterative.Stationary;
+using DotNumerics.LinearAlgebra.CSLapack;
 using MGroup.LinearAlgebra.Iterative;
 using MGroup.LinearAlgebra.Iterative.Stationary;
 using MGroup.LinearAlgebra.Iterative.Stationary.CSR;

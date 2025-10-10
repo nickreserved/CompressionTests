@@ -9,7 +9,6 @@ using MGroup.LinearAlgebra.Iterative.Termination.Iterations;
 using MGroup.LinearAlgebra.Matrices;
 using MGroup.LinearAlgebra.Matrices.Builders;
 using MGroup.LinearAlgebra.Vectors;
-using MGroup.MSolve.Discretization.Entities;
 using System.Diagnostics;
 using Xunit;
 
