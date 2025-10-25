@@ -58,7 +58,7 @@ namespace Compression.tests.MGroup.Solvers.Tests
             for (int i = 0; i < time.Length; ++i)
                 File.AppendAllText(logFilePath, $"\tLevel {i}: {time[i]}ms\n");
 
-            Assert.True(stats.HasConverged);
+            Xunit.Assert.True(stats.HasConverged);
         }
 
         private static void Solve(IGeometricMultigridModel model, int iterations, double convergenceTolerance)

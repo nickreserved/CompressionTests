@@ -35,7 +35,7 @@ namespace MGroup.LinearAlgebra.Tests.Matrices
 			mat1.Multiply(vec, vec1);
 			mat1.Multiply(vec, vec2);
 
-			Assert.True(vec1[0] == 11 && vec2[0] == 11 && vec1[1] == 0 && vec2[1] == 0);
+			Xunit.Assert.True(vec1[0] == 11 && vec2[0] == 11 && vec1[1] == 0 && vec2[1] == 0);
 		}
 
         [Fact]
@@ -65,7 +65,7 @@ namespace MGroup.LinearAlgebra.Tests.Matrices
             double endDeflectionComputed =
                 beam.CalculateAverageEndDeflectionFromSolution(solver.LinearSystem.Solution, algebraicModel);
             var comparer = new ValueComparer(2e-2);
-            Assert.True(comparer.AreEqual(endDeflectionExpected, endDeflectionComputed));
+            Xunit.Assert.True(comparer.AreEqual(endDeflectionExpected, endDeflectionComputed));
         }
     }
 }

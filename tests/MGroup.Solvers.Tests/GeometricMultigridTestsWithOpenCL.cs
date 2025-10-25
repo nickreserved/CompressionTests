@@ -17,9 +17,9 @@ namespace Compression.tests.MGroup.Solvers.Tests
         public void OpenCLTestInitializationAndRun()
         {
             Platform[] platforms = Platform.GetPlatforms();
-            Assert.NotEmpty(platforms);
+            Xunit.Assert.NotEmpty(platforms);
             Device[] devices = platforms[0].GetDevices();     // select a platform to get devices
-            Assert.NotEmpty(devices);
+            Xunit.Assert.NotEmpty(devices);
             OpenCL context = new OpenCL(platforms[0].platformId, /*devices[0].deviceId*/devices.Select(x => x.deviceId).ToArray());
 
             CLProgram program = Program.CreateProgram(context, "CsrGeometricMultigrid", "-cl-std=CL2.0");
@@ -53,7 +53,7 @@ namespace Compression.tests.MGroup.Solvers.Tests
             bool c = true;
             for (int i = 0; i < values.Length; ++i)
                 if (result[i] != values[i] * values[i]) { c = false; break; }
-            Assert.True(c);
+            Xunit.Assert.True(c);
         }
 
         private static String logFilePath = "out.txt";
@@ -84,10 +84,7 @@ namespace Compression.tests.MGroup.Solvers.Tests
             if (stats.HasConverged)
                 File.AppendAllText(logFilePath, $"\tCONVERGED after {stats.NumIterationsRequired} iterations and a residual of {stats.ConvergenceCriterion.value}\n");
             else File.AppendAllText(logFilePath, $"\tNOT converged after {stats.NumIterationsRequired} iterations and a residual of {stats.ConvergenceCriterion.value}\n");
-//            for (int i = 0; i < time.Length; ++i)
-//                File.AppendAllText(logFilePath, $"\tLevel {i}: {time[i]}ms\n");
-
-            Assert.True(stats.HasConverged);
+            Xunit.Assert.True(stats.HasConverged);
         }
 
         private static readonly int[] ElementsPerAxis1 = { 256, 16 };
@@ -128,9 +125,9 @@ namespace Compression.tests.MGroup.Solvers.Tests
                                                                     int iterations = 10000, double convergenceTolerance = 1e-5)
         {
             Platform[] platforms = Platform.GetPlatforms();
-            Assert.NotEmpty(platforms);
+            Xunit.Assert.NotEmpty(platforms);
             Device[] devices = platforms[0].GetDevices();     // select a platform to get devices
-            Assert.NotEmpty(devices);
+            Xunit.Assert.NotEmpty(devices);
             //Assert.True(devices[0].extensions.Contains("cl_khr_non_uniform_work_group")); // local_workgroup must be 1 because extension is not supported in my PC
             //OpenCL context = new OpenCL(platforms[0].platformId, devices.Select(x => x.deviceId).ToArray());
             OpenCL context = new OpenCL(platforms[0].platformId, devices[0].deviceId);
@@ -142,13 +139,9 @@ namespace Compression.tests.MGroup.Solvers.Tests
                 while (product > 16384) { product /= 4; ++depth; }
             }
 
-
-            //IGeometricMultigridModel model = new FemCantilever2D(new int[] { 256, 16 }, new double[] { 20, 1, 1 });
-            //IGeometricMultigridModel model = new FemCantilever2D(new int[] { 2048, 128 }, new double[] { 20, 1, 1 });
             IGeometricMultigridModel model = elementsPerAxis.Length == 3
                 ? new FemCantilever3D(elementsPerAxis, lengthPerAxis)
                 : new FemCantilever2D(elementsPerAxis, lengthPerAxis);
-            //IGeometricMultigridModel model = new FemCantilever3D(new int[] { 2048, 128, 256 }, new double[] { 20, 1, 1 });
 
             Solve(context, devices[0], model, DuVi, GaussSeidel, iterations, convergenceTolerance, depth, iterationsPerLevel);
         }

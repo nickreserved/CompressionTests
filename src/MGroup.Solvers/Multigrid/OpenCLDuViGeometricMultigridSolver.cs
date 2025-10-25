@@ -396,7 +396,7 @@ namespace Compression.src.MGroup.Solvers.Multigrid
         /// </summary>
         /// <param name="xInitialGuess">The initial guess x vector. If initially first level is not 0, then it corresponds to that level (<see cref="firstLevel"/>).
         /// After solving, it has the solution if the problem converges.</param>
-        /// <returns>Algorithm statistics and time counts for the solution in each level.</returns>
+        /// <returns>Algorithm statistics and time counts for the solution in each level. Time is 0 in each level because counting is inaccurate.</returns>
         public (IterativeStatistics, double[]) Solve(Vector? xInitialGuess)
         {
             if (LevelDoFs == null) throw new InvalidOperationException("You must call Initialize(model) first");
@@ -412,9 +412,6 @@ namespace Compression.src.MGroup.Solvers.Multigrid
             //for (int i = 0; i < firstLevel; ++i)
             //    r[i + 1] = restriction[i].Multiply(r[i]);
 
-            double[] time = new double[totalLevels];
-            Stopwatch stopwatch = new();
-
             // loop of cycles
             for (int currentIteration = 0; ; ++currentIteration)
             {
@@ -423,9 +420,6 @@ namespace Compression.src.MGroup.Solvers.Multigrid
                 // loop of steps inside a cycle
                 for (int step = 0; step < LevelDown.Length; ++step)
                 {
-                    // Multigrid level time count
-                    stopwatch.Restart();
-
                     if (currentLevel == totalLevels - 1)
                     {
                         OutputVectorX(currentLevel, bufferOfVectorB, "B");
@@ -600,7 +594,7 @@ namespace Compression.src.MGroup.Solvers.Multigrid
                                                 NumIterationsRequired = currentIteration,
                                                 ConvergenceCriterion = ("dumb text", ConvergenceTolerance),
                                                 HasConverged = converged
-                                            }, time);
+                                            }, new double[totalLevels]);
                                 }
                                 else // not converged
                                     context.FillBuffer(commandQueue, bufferOfZero, 0, sizeof(UInt32), 1);
@@ -686,9 +680,6 @@ namespace Compression.src.MGroup.Solvers.Multigrid
                             OutputVectorX(currentLevel - 1, bufferOfVectorX, "X");
                         }
                     }
-                    // Multigrid level time count
-                    stopwatch.Stop();
-                    time[currentLevel] += stopwatch.Elapsed.TotalMilliseconds;
 
                     currentLevel += LevelDown[step] ? 1 : -1;
                 }
