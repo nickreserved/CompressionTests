@@ -1,3 +1,7 @@
+#ifdef USE_8_BIT_VALUE_INDICES
+#define USE_LOCAL_MEMORY
+#endif // USE_8_BIT_VALUE_INDICES
+
 #ifdef USE_LOCAL_MEMORY	// faster compilation
 /** A Jacobi iteration.
 \param row_indices_on_column_indices Indices to first block of matrix's each row.
@@ -27,7 +31,7 @@ void copy_values(
 
     barrier(CLK_LOCAL_MEM_FENCE);
 }
-#endif
+#endif // USE_LOCAL_MEMORY
 
 
 //-------------------------------------------------------------- MATRIX - VECTOR MULTIPLICATION ----
@@ -55,12 +59,16 @@ void matrix_vector_product_partial(
 	__global const uint *row_indices_on_delta_distance_indices,
 	__global const uint *column_indices,
 	__global const uchar *delta_distances,
+#ifdef USE_8_BIT_VALUE_INDICES
+	__global const uchar *value_indices,
+#else
 	__global const ushort *value_indices,
+#endif // USE_8_BIT_VALUE_INDICES
 #ifdef USE_LOCAL_MEMORY
 	__local const double *values,
 #else
 	__global const double *values,
-#endif
+#endif // USE_LOCAL_MEMORY
 	uint row,
 	__global const double *x,
 	__global double *y,
@@ -116,10 +124,14 @@ __kernel void matrix_vector_product(
 	__global const uint *row_indices_on_delta_distance_indices,
 	__global const uint *column_indices,
 	__global const uchar *delta_distances,
+#ifdef USE_8_BIT_VALUE_INDICES
+	__global const uchar *value_indices,
+#else
 	__global const ushort *value_indices,
+#endif // USE_8_BIT_VALUE_INDICES
 #ifdef USE_LOCAL_MEMORY
 	__global const double *global_values,
-#else
+#else // USE_LOCAL_MEMORY
 	__global const double *values,
 #endif
 	__global const double *x,
@@ -135,7 +147,7 @@ __kernel void matrix_vector_product(
 #else
 	uint rows)
 {
-#endif
+#endif // USE_LOCAL_MEMORY
 
 	uint row = get_global_id(0);
 	if (row >= rows) return;
@@ -167,12 +179,16 @@ void residual_partial(
 	__global const uint *row_indices_on_delta_distance_indices,
 	__global const uint *column_indices,
 	__global const uchar *delta_distances,
+#ifdef USE_8_BIT_VALUE_INDICES
+	__global const uchar *value_indices,
+#else
 	__global const ushort *value_indices,
+#endif // USE_8_BIT_VALUE_INDICES
 #ifdef USE_LOCAL_MEMORY
 	__local const double *values,
 #else
 	__global const double *values,
-#endif
+#endif // USE_LOCAL_MEMORY
 	uint row,
 	__global const double *b,
 	__global const double *x,
@@ -206,12 +222,16 @@ __kernel void residual(
 	__global const uint *row_indices_on_delta_distance_indices,
 	__global const uint *column_indices,
 	__global const uchar *delta_distances,
+#ifdef USE_8_BIT_VALUE_INDICES
+	__global const uchar *value_indices,
+#else
 	__global const ushort *value_indices,
+#endif // USE_8_BIT_VALUE_INDICES
 #ifdef USE_LOCAL_MEMORY
 	__global const double *global_values,
 #else
 	__global const double *values,
-#endif
+#endif // USE_LOCAL_MEMORY
 	__global const double *b,
 	__global const double *x,
 	__global double *r,
@@ -225,7 +245,7 @@ __kernel void residual(
 #else
 	uint rows)
 {
-#endif
+#endif // USE_LOCAL_MEMORY
 
 	uint row = get_global_id(0);
 	if (row >= rows) return;
@@ -257,12 +277,16 @@ __kernel void residual_with_check(
 	__global const uint *row_indices_on_delta_distance_indices,
 	__global const uint *column_indices,
 	__global const uchar *delta_distances,
+#ifdef USE_8_BIT_VALUE_INDICES
+	__global const uchar *value_indices,
+#else
 	__global const ushort *value_indices,
+#endif // USE_8_BIT_VALUE_INDICES
 #ifdef USE_LOCAL_MEMORY
 	__global const double *global_values,
 #else
 	__global const double *values,
-#endif
+#endif // USE_LOCAL_MEMORY
 	__global const double *b,
 	__global const double *x,
 	__global double *r,
@@ -278,7 +302,7 @@ __kernel void residual_with_check(
 #else
 	uint rows)
 {
-#endif
+#endif // USE_LOCAL_MEMORY
 
 	uint row = get_global_id(0);
 	if (row >= rows) return;
@@ -341,12 +365,16 @@ __kernel void jacobi_iteration(
 	__global const uint *row_indices_on_delta_distance_indices,
 	__global const uint *column_indices,
 	__global const uchar *delta_distances,
+#ifdef USE_8_BIT_VALUE_INDICES
+	__global const uchar *value_indices,
+#else
 	__global const ushort *value_indices,
+#endif // USE_8_BIT_VALUE_INDICES
 #ifdef USE_LOCAL_MEMORY
 	__global const double *global_values,
 #else
 	__global const double *values,
-#endif
+#endif // USE_LOCAL_MEMORY
 	__global const double *b,
 	__global const double *x,
 	__global double *y,
@@ -360,7 +388,7 @@ __kernel void jacobi_iteration(
 #else
 	uint rows)
 {
-#endif
+#endif // USE_LOCAL_MEMORY
 
 	uint row = get_global_id(0);
 	if (row >= rows) return;
@@ -397,7 +425,11 @@ __kernel void gauss_seidel_iteration(
 	__global const uint *row_indices_on_delta_distance_indices,
 	__global const uint *column_indices,
 	__global const uchar *delta_distances,
+#ifdef USE_8_BIT_VALUE_INDICES
 	__global const ushort *value_indices,
+#else
+	__global const uchar *value_indices,
+#endif // USE_8_BIT_VALUE_INDICES
 #ifdef USE_LOCAL_MEMORY
 	__global const double *global_values,
 #else
