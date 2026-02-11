@@ -2,11 +2,8 @@ namespace Compression.tests.MGroup.LinearAlgebra.Tests.TestData.SparseLinearSyst
 {
     using Compression.src.MGroup.Solvers.Multigrid;
     using global::MGroup.LinearAlgebra.Matrices;
-    using global::MGroup.LinearAlgebra.Matrices.Builders;
     using global::MGroup.LinearAlgebra.Vectors;
-    using global::MGroup.MSolve.Discretization.Meshes.Structured;
     using System;
-    using System.Linq;
 
     public class FemCantilever3D : FemCantileverBase
     {

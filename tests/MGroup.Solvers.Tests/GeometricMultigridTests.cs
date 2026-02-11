@@ -25,10 +25,10 @@ namespace Compression.tests.MGroup.Solvers.Tests
             //FemCantilever2D model = new FemCantilever2D(new int[] { 50, 5 }, new double[] { 20, 1, 1 }); // non power of 2 elements per axis
             IGeometricMultigridModel model = new FemCantilever2D(new int[] { 256, 16 }, new double[] { 20, 1, 1 });
 
-            Solve(() => GeometricMultigridSolver.CreateSimpleV(model, false, GeometricMultigridSolver.MatrixType.CSR, iterations, convergenceTolerance));
-            Solve(() => GeometricMultigridSolver.CreateSimpleV(model, false, GeometricMultigridSolver.MatrixType.DUVI, iterations, convergenceTolerance));
-            Solve(() => GeometricMultigridSolver.CreateSimpleV(model, true, GeometricMultigridSolver.MatrixType.CSR, iterations, convergenceTolerance));
-            Solve(() => GeometricMultigridSolver.CreateSimpleV(model, true, GeometricMultigridSolver.MatrixType.DUVI, iterations, convergenceTolerance));
+            Solve(() => GeometricMultigridSolver.CreateSimpleV(model, false, GeometricMultigridSolver.MatrixType.CSR, iterations, false, convergenceTolerance));
+            Solve(() => GeometricMultigridSolver.CreateSimpleV(model, false, GeometricMultigridSolver.MatrixType.DUVI, iterations, false, convergenceTolerance));
+            Solve(() => GeometricMultigridSolver.CreateSimpleV(model, true, GeometricMultigridSolver.MatrixType.CSR, iterations, false, convergenceTolerance));
+            Solve(() => GeometricMultigridSolver.CreateSimpleV(model, true, GeometricMultigridSolver.MatrixType.DUVI, iterations, false, convergenceTolerance));
         }
 
         private static String logFilePath = "out.txt";
@@ -40,9 +40,9 @@ namespace Compression.tests.MGroup.Solvers.Tests
             GeometricMultigridSolver solver = initializer();
             stopwatch.Stop();
             double timeGMGI = stopwatch.Elapsed.TotalMilliseconds;
-            Vector x = Vector.CreateZero(solver.NumDofsFree(0));
+            Vector? x = null;
             stopwatch.Restart();
-            (IterativeStatistics stats, double[] time) = solver.Solve(x);
+            (x, IterativeStatistics stats, double[] time) = solver.Solve(x);
             stopwatch.Stop();
             double timeGMGS = stopwatch.Elapsed.TotalMilliseconds;
 
@@ -100,10 +100,10 @@ namespace Compression.tests.MGroup.Solvers.Tests
             int iterations = 10000;
             IGeometricMultigridModel model = new FemCantilever2D(new int[] { 256, 16 }, new double[] { 20, 1, 1 });
 
-            Solve(() => GeometricMultigridSolver.CreateDeepV(model, false, GeometricMultigridSolver.MatrixType.CSR, iterations, convergenceTolerance, 2, 4));
-            Solve(() => GeometricMultigridSolver.CreateDeepV(model, false, GeometricMultigridSolver.MatrixType.DUVI, iterations, convergenceTolerance, 2, 4));
-            Solve(() => GeometricMultigridSolver.CreateDeepV(model, true, GeometricMultigridSolver.MatrixType.CSR, iterations, convergenceTolerance, 2, 4));
-            Solve(() => GeometricMultigridSolver.CreateDeepV(model, true, GeometricMultigridSolver.MatrixType.DUVI, iterations, convergenceTolerance, 2, 4));
+            Solve(() => GeometricMultigridSolver.CreateDeepV(model, false, GeometricMultigridSolver.MatrixType.CSR, iterations, false, convergenceTolerance, 2, 4));
+            Solve(() => GeometricMultigridSolver.CreateDeepV(model, false, GeometricMultigridSolver.MatrixType.DUVI, iterations, false, convergenceTolerance, 2, 4));
+            Solve(() => GeometricMultigridSolver.CreateDeepV(model, true, GeometricMultigridSolver.MatrixType.CSR, iterations, false, convergenceTolerance, 2, 4));
+            Solve(() => GeometricMultigridSolver.CreateDeepV(model, true, GeometricMultigridSolver.MatrixType.DUVI, iterations, false, convergenceTolerance, 2, 4));
             Solve(model, iterations, convergenceTolerance); // CG
         }
     }

@@ -11,7 +11,7 @@ using System.Diagnostics;
 
 namespace Compression.src.MGroup.Solvers.Multigrid
 {
-    public class OpenCLDuViGeometricMultigridSolver : IGeometricMultigridSolver
+    public class OpenCLDuViGeometricMultigridSolver : IOpenCLGeometricMultigridSolver
     {
         private struct DuViMat
         {
@@ -67,10 +67,10 @@ namespace Compression.src.MGroup.Solvers.Multigrid
         /// <param name="levelIterations">How many Jacobi or Gauss-Seidel iterations will be executed on each step.</param>
         /// <returns>The solver object ready to solve.</returns>
         public static OpenCLDuViGeometricMultigridSolver CreateSimpleV(Device device, OpenCL context, IGeometricMultigridModel model, bool GaussSeidel = true,
-            int maxCircleIterations = MaxCircleIterations, double convergenceTolerance = 1e-6, int levelIterations = 4)
+            int maxCircleIterations = MaxCircleIterations, bool coarseRelaxation = true, double convergenceTolerance = 1e-6, int levelIterations = 4)
         {
             OpenCLDuViGeometricMultigridSolver a = new(context, maxCircleIterations, convergenceTolerance, new bool[] { true, false }, new int[] { levelIterations }, GaussSeidel);
-            a.Initialize(device, model);
+            a.Initialize(device, model, coarseRelaxation);
             return a;
         }
 
@@ -87,11 +87,11 @@ namespace Compression.src.MGroup.Solvers.Multigrid
         /// <param name="levelIterations">How many Jacobi or Gauss-Seidel iterations will be executed on each step.</param>
         /// <returns>The solver object ready to solve.</returns>
         public static OpenCLDuViGeometricMultigridSolver CreateDeepV(Device device, OpenCL context, IGeometricMultigridModel model, bool GaussSeidel = true,
-            int maxCircleIterations = MaxCircleIterations, double convergenceTolerance = 1e-6, int depth = 2, int levelIterations = 4)
+            int maxCircleIterations = MaxCircleIterations, bool coarseRelaxation = true, double convergenceTolerance = 1e-6, int depth = 2, int levelIterations = 4)
         {
             bool[] levelDown = Enumerable.Repeat(true, depth).Concat(Enumerable.Repeat(false, depth)).ToArray();
             OpenCLDuViGeometricMultigridSolver a = new(context, maxCircleIterations, convergenceTolerance, levelDown, new int[] { levelIterations }, GaussSeidel);
-            a.Initialize(device, model);
+            a.Initialize(device, model, coarseRelaxation);
             return a;
         }
 
@@ -115,12 +115,53 @@ namespace Compression.src.MGroup.Solvers.Multigrid
             ConvergenceTolerance = convergenceTolerance;
         }
 
+        public void ReleaseOpenCLResources()
+        {
+            context.ReleaseMemObject(bufferOfVectorR);
+            context.ReleaseMemObject(bufferOfZero);
+            foreach (CLMem k in bufferOfPrecond)
+                context.ReleaseMemObject(k);
+            foreach (CLMem k in bufferOfRowOffsetsToColumns)
+                context.ReleaseMemObject(k);
+            foreach (CLMem k in bufferOfRowOffsetsToDistances)
+                context.ReleaseMemObject(k);
+            foreach (CLMem k in bufferOfColumnIndices)
+                context.ReleaseMemObject(k);
+            foreach (CLMem k in bufferOfDistances)
+                context.ReleaseMemObject(k);
+            foreach (CLMem k in bufferOfValueIndices)
+                context.ReleaseMemObject(k);
+            foreach (CLMem k in bufferOfValues)
+                context.ReleaseMemObject(k);
+            foreach (CLMem k in bufferOfVectorB)
+                context.ReleaseMemObject(k);
+            foreach (CLMem k in bufferOfVectorX)
+                context.ReleaseMemObject(k);
+
+            context.ReleaseKernel(kernelJacobiInitial);
+            foreach (CLKernel k in kernelResidual)
+                context.ReleaseKernel(k);
+            foreach (CLKernel k in kernelResidualWithCheck)
+                context.ReleaseKernel(k);
+            foreach (CLKernel k in kernelJacobi)
+                context.ReleaseKernel(k);
+            foreach (CLKernel k in kernelGaussSeidel)
+                context.ReleaseKernel(k);
+            foreach (CLKernel k in kernelMatrixVectorProduct)
+                context.ReleaseKernel(k);
+
+            context.ReleaseCommandQueue(commandQueue);
+
+            foreach (CLProgram k in program)
+                context.ReleaseProgram(k);
+        }
+
         /// <summary>
         /// Initialize Geometric Multigrid solver
         /// </summary>
         /// <param name="device">OpenCL device.</param>
         /// <param name="model">The geometric multigrid model.</param>
-        public void Initialize(Device device, IGeometricMultigridModel model)
+        public void Initialize(Device device, IGeometricMultigridModel model, bool coarseRelaxation)
         {
             // device specific things
            // NonUniformWorkgroup = device.extensions.Contains("cl_khr_non_uniform_work_group");
@@ -143,12 +184,12 @@ namespace Compression.src.MGroup.Solvers.Multigrid
             {
                 (model, DokRowMajor restrictionB, DokRowMajor interpolationB) = model.CreateCoarserModelAndSmoothenerMatrices();
                 LevelDoFs[i + 1] = restrictionB.NumRows;
-                preconditioners[i] = GeometricMultigridSolver.JacobiPreconditioner(A.RawRows);
+                preconditioners[i] = coarseRelaxation ? GeometricMultigridSolver.JacobiPreconditioner(A.RawRows)
+                                                        : GeometricMultigridSolver.RelaxedJacobiPreconditioner(A.RawRows);
                 mat[3 * i + 0] = FromDokRowMajor(A);
                 mat[3 * i + 1] = FromDokRowMajor(restrictionB);
                 mat[3 * i + 2] = FromDokRowMajor(interpolationB);
                 (A, _) = model.CreateLinearSystem();
-
             }
             // initialize number of elements of matrices for copy from global to local memory
             for (int i = 0; i < mat.Length; ++i)
@@ -159,7 +200,8 @@ namespace Compression.src.MGroup.Solvers.Multigrid
             for (int i = 0; i < mat.Length; ++i)
                 UseLocalMemory[i] = mat[i].Values.Length * sizeof(double) <= LocalMemorySize;
 
-            coarseStiffnessLdlFactorized = GeometricMultigridSolver.HealJacobiAndCreateLDL(true, A, preconditioners);
+            if (coarseRelaxation) GeometricMultigridSolver.RelaxateJacobiPreconditioners(A, preconditioners);
+            coarseStiffnessLdlFactorized = SkylineMatrix.CreateFromMatrix(A.BuildCsrMatrix(true).CopyToFullMatrix(), 1e-15).FactorLdl(true, 1e-15);
 
             OpenCLCsrGeometricMultigridSolver.CalculateWorkgroupSizes(LevelDoFs, LocalWorkgroupSize, false, GlobalWorkSize, LocalWorkSize);
 
@@ -397,7 +439,7 @@ namespace Compression.src.MGroup.Solvers.Multigrid
         /// <param name="xInitialGuess">The initial guess x vector. If initially first level is not 0, then it corresponds to that level (<see cref="firstLevel"/>).
         /// After solving, it has the solution if the problem converges.</param>
         /// <returns>Algorithm statistics and time counts for the solution in each level. Time is 0 in each level because counting is inaccurate.</returns>
-        public (IterativeStatistics, double[]) Solve(Vector? xInitialGuess)
+        public (Vector, IterativeStatistics, double[]) Solve(Vector? xInitialGuess)
         {
             if (LevelDoFs == null) throw new InvalidOperationException("You must call Initialize(model) first");
 
@@ -590,7 +632,7 @@ namespace Compression.src.MGroup.Solvers.Multigrid
                                 {
                                     context.ReadBuffer(commandQueue, bufferOfVectorX[0], CLBool.True, 0, xInitialGuess.Length * sizeof(double), xInitialGuess.RawData);
 
-                                    return (new IterativeStatistics {
+                                    return (xInitialGuess, new IterativeStatistics {
                                                 NumIterationsRequired = currentIteration,
                                                 ConvergenceCriterion = ("dumb text", ConvergenceTolerance),
                                                 HasConverged = converged

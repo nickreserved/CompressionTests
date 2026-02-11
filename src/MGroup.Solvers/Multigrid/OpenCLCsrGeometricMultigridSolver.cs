@@ -11,7 +11,7 @@ using System.Diagnostics;
 
 namespace Compression.src.MGroup.Solvers.Multigrid
 {
-    public class OpenCLCsrGeometricMultigridSolver : IGeometricMultigridSolver
+    public class OpenCLCsrGeometricMultigridSolver : IOpenCLGeometricMultigridSolver
     {
         private bool[] LevelDown;
         private readonly int[] LevelIterations;
@@ -53,11 +53,11 @@ namespace Compression.src.MGroup.Solvers.Multigrid
         /// <param name="levelIterations">How many Jacobi or Gauss-Seidel iterations will be executed on each step.</param>
         /// <returns>The solver object ready to solve.</returns>
         public static OpenCLCsrGeometricMultigridSolver CreateSimpleV(Device device, OpenCL context, IGeometricMultigridModel model, bool GaussSeidel = true,
-            int maxCircleIterations = MaxCircleIterations, double convergenceTolerance = 1e-6, int levelIterations = 4)
+            int maxCircleIterations = MaxCircleIterations, bool coarseRelaxation = true, double convergenceTolerance = 1e-6, int levelIterations = 4)
         {
             OpenCLCsrGeometricMultigridSolver a = new(context, maxCircleIterations, convergenceTolerance, new bool[] { true, false },
                 new int[] { levelIterations }, GaussSeidel);
-            a.Initialize(device, model);
+            a.Initialize(device, model, coarseRelaxation);
             return a;
         }
 
@@ -74,11 +74,11 @@ namespace Compression.src.MGroup.Solvers.Multigrid
         /// <param name="levelIterations">How many Jacobi or Gauss-Seidel iterations will be executed on each step.</param>
         /// <returns>The solver object ready to solve.</returns>
         public static OpenCLCsrGeometricMultigridSolver CreateDeepV(Device device, OpenCL context, IGeometricMultigridModel model, bool GaussSeidel = true,
-            int maxCircleIterations = MaxCircleIterations, double convergenceTolerance = 1e-6, int depth = 2, int levelIterations = 4)
+            int maxCircleIterations = MaxCircleIterations, bool coarseRelaxation = true, double convergenceTolerance = 1e-6, int depth = 2, int levelIterations = 4)
         {
             bool[] levelDown = Enumerable.Repeat(true, depth).Concat(Enumerable.Repeat(false, depth)).ToArray();
             OpenCLCsrGeometricMultigridSolver a = new(context, maxCircleIterations, convergenceTolerance, levelDown, new int[] { levelIterations }, GaussSeidel);
-            a.Initialize(device, model);
+            a.Initialize(device, model, coarseRelaxation);
             return a;
         }
 
@@ -103,56 +103,46 @@ namespace Compression.src.MGroup.Solvers.Multigrid
             ConvergenceTolerance = convergenceTolerance;
         }
 
-
-
-        /// <summary>
-        /// Calculates the Jacobi preconditioner of a sparse matrix.
-        /// </summary>
-        /// <param name="rows">An array of dictionaries column index -> value, one dictionary for each row of matrix.</param>
-        /// <returns>The Jacobi preconditioner which is the inverse of the main diagonal of the matrix.</returns>
-        private Vector JacobiPreconditioner(Dictionary<int, double>[] rows)
+        public void ReleaseOpenCLResources()
         {
-            Vector x = Vector.CreateZero(rows.Length);
-            for (int i = 0; i < rows.Length; ++i)
-                x[i] = 1 / rows[i][i];
-            return x;
-        }
+            context.ReleaseMemObject(bufferOfVectorR);
+            context.ReleaseMemObject(bufferOfZero);
+            foreach (CLMem k in bufferOfPrecond)
+                context.ReleaseMemObject(k);
+            foreach (CLMem k in bufferOfRowOffsets)
+                context.ReleaseMemObject(k);
+            foreach (CLMem k in bufferOfColumnIndices)
+                context.ReleaseMemObject(k);
+            foreach (CLMem k in bufferOfValues)
+                context.ReleaseMemObject(k);
+            foreach (CLMem k in bufferOfVectorB)
+                context.ReleaseMemObject(k);
+            foreach (CLMem k in bufferOfVectorX)
+                context.ReleaseMemObject(k);
 
-        /// <summary>
-        /// Returns a relatively close upper bound for the eigenvalues of a sparse matrix.
-        /// </summary>
-        /// <remarks>This upper bound is the maximum of the sums of absolute values of rows</remarks>
-        /// <param name="rows">An array of dictionaries column index -> value, one dictionary for each row of matrix.</param>
-        /// <returns>An approximation of the upper bound for the eigenvalues of the given matrix.</returns>
-        private double EigenValueUpperBound(Dictionary<int, double>[] rows)
-        {
-            double l = 0;   // max eigenvalue
-            for (int i = 0; i < rows.Length; ++i)
-                l = Math.Max(l, rows[i].Values.Select(v => Math.Abs(v)).Sum()); // approximation of max eigenvalue
-            return l;
-        }
+            context.ReleaseKernel(kernelJacobiInitial);
+            context.ReleaseKernel(kernelResidual);
+            context.ReleaseKernel(kernelResidualWithCheck);
+            context.ReleaseKernel(kernelJacobi);
+            context.ReleaseKernel(kernelGaussSeidel);
+            context.ReleaseKernel(kernelMatrixVectorProduct);
 
-        /// <summary>
-        /// Under or over relaxes the Jacobi preconditioner of a matrix.
-        /// </summary>
-        /// <remarks>Actually it multiplies the jacobi preconditioner with scalar <c>w = 2 / (lmin + lmax)</c>.
-        /// We can assume that <c>lmin = 0</c> as <c>lmax</c> is larger as approximate upper bound.</remarks>
-        /// <param name="x">The Jacobi preconditioner of a matrix, which is the inverse of the main diagonal of the matrix.
-        /// After the call, it is under or over relaxed.</param>
-        /// <param name="l">An approximation of the upper bound for the eigenvalues of the matrix.</param>
-        private void RelaxateJacobiPreconditioner(Vector x, double l)
-        {
-            l = 2 / l;
-            for (int i = 0; i < x.Length; ++i)
-                x[i] *= l;
+            context.ReleaseCommandQueue(commandQueue);
+
+            context.ReleaseProgram(program);
+
+            /*
+   
+        private CLMem[] bufferOfPrecond, bufferOfRowOffsets, bufferOfColumnIndices, bufferOfValues, bufferOfVectorB, bufferOfVectorX;
+*/
         }
         
         /// <summary>
-        /// Initialize Geometric Multigrid solver
-        /// </summary>
-        /// <param name="device">OpenCL device.</param>
-        /// <param name="model">The geometric multigrid model.</param>
-        public void Initialize(Device device, IGeometricMultigridModel model)
+                 /// Initialize Geometric Multigrid solver
+                 /// </summary>
+                 /// <param name="device">OpenCL device.</param>
+                 /// <param name="model">The geometric multigrid model.</param>
+        public void Initialize(Device device, IGeometricMultigridModel model, bool coarseRelaxation)
         {
             // device specific things
             uint LocalWorkgroupSize = Math.Min(device.workgroupSizeMax, (uint)device.workItemSizes[0]);
@@ -171,13 +161,15 @@ namespace Compression.src.MGroup.Solvers.Multigrid
             {
                 (model, DokRowMajor restrictionB, DokRowMajor interpolationB) = model.CreateCoarserModelAndSmoothenerMatrices();
                 LevelDoFs[i + 1] = restrictionB.NumRows;
-                preconditioners[i] = GeometricMultigridSolver.JacobiPreconditioner(A.RawRows);
+                preconditioners[i] = coarseRelaxation ? GeometricMultigridSolver.JacobiPreconditioner(A.RawRows)
+                                                        : GeometricMultigridSolver.RelaxedJacobiPreconditioner(A.RawRows);
                 mat[3 * i + 0] = A.BuildCsrMatrix(true);                // Stiffness
                 mat[3 * i + 1] = restrictionB.BuildCsrMatrix(true);     // Restriction
                 mat[3 * i + 2] = interpolationB.BuildCsrMatrix(true);   // Interpolation
                 (A, _) = model.CreateLinearSystem();
             }
-            coarseStiffnessLdlFactorized = GeometricMultigridSolver.HealJacobiAndCreateLDL(true, A, preconditioners);
+            if (coarseRelaxation) GeometricMultigridSolver.RelaxateJacobiPreconditioners(A, preconditioners);
+            coarseStiffnessLdlFactorized = SkylineMatrix.CreateFromMatrix(A.BuildCsrMatrix(true).CopyToFullMatrix(), 1e-15).FactorLdl(true, 1e-15);
 
             CalculateWorkgroupSizes(LevelDoFs, LocalWorkgroupSize, false, GlobalWorkSize, LocalWorkSize);
 
@@ -339,7 +331,7 @@ namespace Compression.src.MGroup.Solvers.Multigrid
         /// <param name="xInitialGuess">The initial guess x vector. If initially first level is not 0, then it corresponds to that level (<see cref="firstLevel"/>).
         /// After solving, it has the solution if the problem converges.</param>
         /// <returns>Algorithm statistics and time counts for the solution in each level. Time is just 0 in each level because it is not accurate.</returns>
-        public (IterativeStatistics, double[]) Solve(Vector? xInitialGuess)
+        public (Vector, IterativeStatistics, double[]) Solve(Vector? xInitialGuess)
         {
             if (LevelDoFs == null) throw new InvalidOperationException("You must call Initialize(model) first");
 
@@ -487,7 +479,7 @@ namespace Compression.src.MGroup.Solvers.Multigrid
                                 {
                                     context.ReadBuffer(commandQueue, bufferOfVectorX[0], CLBool.True, 0, xInitialGuess.Length * sizeof(double), xInitialGuess.RawData);
 
-                                    return (new IterativeStatistics {
+                                    return (xInitialGuess, new IterativeStatistics {
                                                 NumIterationsRequired = currentIteration,
                                                 ConvergenceCriterion = ("dumb text", ConvergenceTolerance),
                                                 HasConverged = converged

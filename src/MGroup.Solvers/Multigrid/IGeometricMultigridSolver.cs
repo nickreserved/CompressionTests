@@ -5,6 +5,6 @@ namespace Compression.src.MGroup.Solvers.Multigrid
 {
     public interface IGeometricMultigridSolver
     {
-        (IterativeStatistics, double[]) Solve(Vector? xInitialGuess);
+        (Vector, IterativeStatistics, double[]) Solve(Vector? xInitialGuess);
     }
 }
