@@ -442,10 +442,10 @@ namespace Compression.src.MGroup.Solvers.Multigrid
             #endif
         }
 
-        private void OutputVectorX(int currentLevel, CLMem[] bufferOfVector, string name)
-            => OutputVectorX(currentLevel, bufferOfVector[currentLevel], name);
-        private void OutputVectorX(int currentLevel, CLMem bufferOfVector, string name)
-            => OpenCLCsrGeometricMultigridSolver.OutputVectorX(currentLevel, bufferOfVector, name, true, context, commandQueue, GaussSeidel, LevelDoFs);
+        private void OutputVector(int currentLevel, CLMem[] bufferOfVector, string name)
+            => OutputVector(currentLevel, bufferOfVector[currentLevel], name);
+        private void OutputVector(int currentLevel, CLMem bufferOfVector, string name)
+            => OpenCLCsrGeometricMultigridSolver.OutputVector(currentLevel, bufferOfVector, name, true, context, commandQueue, GaussSeidel, LevelDoFs);
 
         /// <summary>
         /// Solves the geometric multigrid.
@@ -478,7 +478,7 @@ namespace Compression.src.MGroup.Solvers.Multigrid
                 {
                     if (currentLevel == totalLevels - 1)
                     {
-                        OutputVectorX(currentLevel, bufferOfVectorB, "B");
+                        OutputVector(currentLevel, bufferOfVectorB, "B");
 
                         // Get vector b from OpenCL device,
                         // LDL factorization on b[currentLevel] and result on b[currentLevel] (instead of x[currentLevel] which is not allocated),
@@ -488,7 +488,7 @@ namespace Compression.src.MGroup.Solvers.Multigrid
                         b = coarseStiffnessLdlFactorized.SolveLinearSystem(b);
                         context.WriteBuffer(commandQueue, bufferOfVectorB.Last(), CLBool.True, 0, b.Length * sizeof(double), b.RawData);
 
-                        OutputVectorX(currentLevel, bufferOfVectorB, "X");
+                        OutputVector(currentLevel, bufferOfVectorB, "X");
 
                         // interpolate b[currentLevel] (instead of x[currentLevel] which is not allocated) and add to previous value of x[currentLevel - 1]
                         int vecidx = currentLevel - 1;
@@ -514,7 +514,7 @@ namespace Compression.src.MGroup.Solvers.Multigrid
                         }
                         context.NDRangeKernel(commandQueue, kMVP, 1, null, GlobalWorkSize[vecidx], LocalWorkSize[vecidx]);
 
-                        OutputVectorX(vecidx, bufferOfVectorX, "X");
+                        OutputVector(vecidx, bufferOfVectorX, "X");
                     }
                     else
                     {
@@ -686,9 +686,9 @@ namespace Compression.src.MGroup.Solvers.Multigrid
                                 context.NDRangeKernel(commandQueue, kResidual, 1, null, GlobalWorkSize[currentLevel], LocalWorkSize[currentLevel]);
                             }
 
-                            OutputVectorX(currentLevel, bufferOfVectorB, "B");
-                            OutputVectorX(currentLevel, bufferOfVectorX, "X");
-                            OutputVectorX(currentLevel, bufferOfVectorR, "R");
+                            OutputVector(currentLevel, bufferOfVectorB, "B");
+                            OutputVector(currentLevel, bufferOfVectorX, "X");
+                            OutputVector(currentLevel, bufferOfVectorR, "R");
                           
                             { // block to make local the multiple-times-used variables midx, lm
                                 // fine residual to coarse residual
@@ -741,8 +741,8 @@ namespace Compression.src.MGroup.Solvers.Multigrid
                             }
                             context.NDRangeKernel(commandQueue, kMVP, 1, null, GlobalWorkSize[vecidx], LocalWorkSize[vecidx]);
 
-                            OutputVectorX(currentLevel, bufferOfVectorX, "X");
-                            OutputVectorX(currentLevel - 1, bufferOfVectorX, "X");
+                            OutputVector(currentLevel, bufferOfVectorX, "X");
+                            OutputVector(currentLevel - 1, bufferOfVectorX, "X");
                         }
                     }
 

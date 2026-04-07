@@ -228,11 +228,16 @@ __kernel void dot_finalize_and_calc_a(
 {
 	uint lid = get_local_id(0);
 
-	if (lid == 0) a[1] = a[0];	// it will be overwritten
+	if (lid == 0) a[1] = a[0];	// r*z will be overwritten from p*Ap -> keep it in a[1]
 
 	dot_finalize(partial, a, local_mem, n);
 
-	if (lid == 0) a[1] /= a[0];
+	if (lid == 0)
+	{
+		double tmp = a[1];
+		a[1] /= a[0];			// a[1] becomes a = r*z / p*Ap
+		a[0] = tmp;				// restore r*z in a[0]
+	}
 }
 
 

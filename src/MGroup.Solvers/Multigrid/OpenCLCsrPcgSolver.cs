@@ -8,6 +8,7 @@ using MGroup.LinearAlgebra.Triangulation;
 using MGroup.LinearAlgebra.Vectors;
 using MGroup.OCL;
 using System.Diagnostics;
+using System.Xml.Linq;
 
 namespace Compression.src.MGroup.Solvers.Multigrid
 {
@@ -218,14 +219,26 @@ namespace Compression.src.MGroup.Solvers.Multigrid
             context.SetKernelArg(kernelInit, 8, DoFs);
         }
 
-        private void OutputVectorX(CLMem bufferOfVector, string name) => OutputVectorX(bufferOfVector, name, context, commandQueue, DoFs);
+        private void OutputVector(CLMem bufferOfVector, string name) => OutputVector(bufferOfVector, name, context, commandQueue, DoFs);
 
-        private static void OutputVectorX(CLMem bufferOfVector, string name, OpenCL context, CLCommandQueue commandQueue, int DoFs)
+        private static void OutputVector(CLMem bufferOfVector, string name, OpenCL context, CLCommandQueue commandQueue, int DoFs)
         {
             #if DEBUG
             Vector x = Vector.CreateZero(DoFs);
             context.ReadBuffer(commandQueue, bufferOfVector, CLBool.True, 0, x.Length * sizeof(double), x.RawData);
             string line = name + " = [" + string.Join(" ", x.RawData.Select(e => e.ToString("G14"))) + "]" + Environment.NewLine;
+            File.AppendAllText("output_csr_cg_gpu.txt", line);
+            #endif
+        }
+
+        private void OutputScalar(CLMem bufferOfVector, int index, string name) => OutputScalar(bufferOfVector, index, name, context, commandQueue);
+
+        private static void OutputScalar(CLMem bufferOfVector, int index, string name, OpenCL context, CLCommandQueue commandQueue)
+        {
+            #if DEBUG
+            double[] x = new double[1];
+            context.ReadBuffer(commandQueue, bufferOfVector, CLBool.True, index * sizeof(double), sizeof(double), x);
+            string line = name + " = " + x[0] + Environment.NewLine;
             File.AppendAllText("output_csr_cg_gpu.txt", line);
             #endif
         }
@@ -256,10 +269,10 @@ namespace Compression.src.MGroup.Solvers.Multigrid
                 context.NDRangeKernel(commandQueue, kernelInit0, 1, null, GlobalWorkSize, LocalWorkSize);
             }
 
-            OutputVectorX(bufferOfVectorX, "X");
-            OutputVectorX(bufferOfVectorR, "R");
-            OutputVectorX(bufferOfVectorP, "P");
-            OutputVectorX(bufferOfVectorZ, "Z");
+            OutputVector(bufferOfVectorX, "X");
+            OutputVector(bufferOfVectorR, "R");
+            OutputVector(bufferOfVectorP, "P");
+            OutputVector(bufferOfVectorZ, "Z");
 
             context.SetKernelArg(kernelDot1stPass, 0, bufferOfVectorR);
             context.SetKernelArg(kernelDot1stPass, 1, bufferOfVectorZ);
@@ -270,8 +283,10 @@ namespace Compression.src.MGroup.Solvers.Multigrid
             // loop algorithm
             for (int currentIteration = 0; ; ++currentIteration)
             {
+                OutputScalar(bufferOfScalars, 0, "r*z");
+
                 context.NDRangeKernel(commandQueue, kernelMatrixVectorProduct, 1, null, GlobalWorkSize, LocalWorkSize);
-                OutputVectorX(bufferOfVectorAP, "AP");
+                OutputVector(bufferOfVectorAP, "AP");
 
                 context.SetKernelArg(kernelDot1stPass, 0, bufferOfVectorP);
                 context.SetKernelArg(kernelDot1stPass, 1, bufferOfVectorAP);
@@ -279,11 +294,15 @@ namespace Compression.src.MGroup.Solvers.Multigrid
                 
                 context.NDRangeKernel(commandQueue, kernelDot2ndPassCalcA, 1, null, LocalWorkSize, LocalWorkSize);
 
+                OutputScalar(bufferOfScalars, 1, "a");
+
                 context.FillBuffer(commandQueue, bufferOfZero, 0, sizeof(UInt32), 1);   // converged
                 context.NDRangeKernel(commandQueue, kernelUpdateXRZandCheckResidual, 1, null, GlobalWorkSize, LocalWorkSize);
-                OutputVectorX(bufferOfVectorX, "X");
-                OutputVectorX(bufferOfVectorR, "R");
-                OutputVectorX(bufferOfVectorZ, "Z");
+
+                OutputVector(bufferOfVectorX, "X");
+                OutputVector(bufferOfVectorR, "R");
+                OutputVector(bufferOfVectorZ, "Z");
+
                 context.ReadBuffer(commandQueue, bufferOfZero, CLBool.True, 0, sizeof(UInt32), con);
                 bool converged = con[0] == 1;
                 bool failed = (con[0] & 2) == 2;  // some numbers become NaN
@@ -305,8 +324,11 @@ namespace Compression.src.MGroup.Solvers.Multigrid
 
                 context.NDRangeKernel(commandQueue, kernelDot2ndPassCalcB, 1, null, LocalWorkSize, LocalWorkSize);
 
+                OutputScalar(bufferOfScalars, 1, "b");
+
                 context.NDRangeKernel(commandQueue, kernelUpdateP, 1, null, GlobalWorkSize, LocalWorkSize);
-                OutputVectorX(bufferOfVectorP, "P");
+
+                OutputVector(bufferOfVectorP, "P");
             }
         }
     }

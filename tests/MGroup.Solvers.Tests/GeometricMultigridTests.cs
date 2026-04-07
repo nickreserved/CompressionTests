@@ -78,7 +78,45 @@ namespace Compression.tests.MGroup.Solvers.Tests
             double timeCGI = stopwatch.Elapsed.TotalMilliseconds;
             Vector x = Vector.CreateZero(model.NumDofsFree);
             stopwatch.Restart();
-            IterativeStatistics stats = methodCG.Solve(stiffness, b, x, true);  // Solve
+            //TODO: IterativeStatistics stats = methodCG.Solve(stiffness, b, x, true);  // Solve
+            /// =============== REIMPLEMENT THE WHEEL FOR DEBUG PURPOSES
+            IterativeStatistics stats = new();
+            stats.HasConverged = false;
+            stats.NumIterationsRequired = iterations;
+            {
+                Vector M = Vector.CreateFromArray(stiffness.GetDiagonalAsArray());
+                for (int i = 0; i < M.Length; ++i)
+                    M.RawData[i] = 1 / M.RawData[i];
+                
+                Vector r = b.Copy();
+                r.SubtractIntoThis(stiffness.Multiply(x));
+                Vector z = M.MultiplyEntrywise(r);
+                Vector p = z.Copy();
+                double rz = r.DotProduct(z);
+
+                for (int iteration = 0; iteration < iterations; ++iteration)
+                {
+                    Vector Ap = stiffness.Multiply(p);
+                    double a = rz / p.DotProduct(Ap);
+                    x.AddIntoThis(p.Scale(a));
+                    r.AddIntoThis(Ap.Scale(-a));
+
+                    bool nobreak = false;
+                    for (int i = 0; i < r.Length; ++i)
+                        if (Math.Abs(r[i]) > convergenceTolerance) nobreak = true;
+                        else stats.ResidualNormRatioEstimation = Math.Abs(r[i]);
+                    if (!nobreak) { stats.HasConverged = true; stats.NumIterationsRequired = iteration; break; }
+
+                    z = M.MultiplyEntrywise(r);
+                    double rz2 = r.DotProduct(z);
+                    double beta = rz2 / rz;
+                    p.ScaleIntoThis(beta);
+                    p.AddIntoThis(z);
+                    rz = rz2;
+                }
+            }
+            /// =============== END REIMPLEMENTATION
+
             stopwatch.Stop();
             double timeCG = stopwatch.Elapsed.TotalMilliseconds;
             File.AppendAllText(logFilePath, $"\nRequired time for CG with matrix type CSR: {timeCGI + timeCG}ms\n");

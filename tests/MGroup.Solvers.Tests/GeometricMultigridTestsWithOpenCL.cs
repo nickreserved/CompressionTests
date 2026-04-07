@@ -131,7 +131,7 @@ namespace Compression.tests.MGroup.Solvers.Tests
                 : new FemCantilever2D(elementsPerAxis, lengthPerAxis);
 
             Device device = devices[0];
-            int iterations = 2000;
+            int iterations = 20000;
             double convergenceTolerance = 1e-5;
 
             Stopwatch stopwatch = new();
