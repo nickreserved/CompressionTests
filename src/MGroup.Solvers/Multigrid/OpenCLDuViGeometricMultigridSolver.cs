@@ -857,6 +857,6 @@ namespace Compression.src.MGroup.Solvers.Multigrid
         /// </summary>
         /// <param name="error">The error code returned from an OpenCL command</param>
         /// <exception cref="OpenCLException">An exception thrown</exception>
-        private static void ThrowCLException(CLError error)  { if (error != CLError.Success) throw new OpenCLException(error); }
+        internal static void ThrowCLException(CLError error)  { if (error != CLError.Success) throw new OpenCLException(error); }
     }
 }

@@ -35,19 +35,12 @@
     <Folder Include="src\MGroup.Solvers\AlgebraicModel\" />
   </ItemGroup>
 
-  <ItemGroup>
-    <None Update="src\MGroup.OCL\CsrGeometricMultigrid.cl">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="src\MGroup.OCL\DuViGeometricMultigrid.cl">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="src\MGroup.OCL\DuViGeometricMultigridLocal.cl">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="src\MGroup.OCL\HybridGaussSeidel.cl">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
+	<ItemGroup>
+		<CLFiles Include="src\MGroup.OCL\*.cl" />
+	</ItemGroup>
+
+	<Target Name="CopyCLFilesFlattened" AfterTargets="Build">
+		<Copy SourceFiles="@(CLFiles)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" />
+	</Target>
 
 </Project>

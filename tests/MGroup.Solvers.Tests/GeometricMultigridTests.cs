@@ -93,18 +93,199 @@ namespace Compression.tests.MGroup.Solvers.Tests
 
         }
 
-        [Fact]
-        public static void CheckCantilever2dSolutionDeepV()
-        {
-            double convergenceTolerance = 1e-5;
-            int iterations = 10000;
-            IGeometricMultigridModel model = new FemCantilever2D(new int[] { 256, 16 }, new double[] { 20, 1, 1 });
+        private static readonly int[] ElementsPerAxis1 = { 256, 16 };
+        private static readonly int[] ElementsPerAxis2 = { 256, 16, 16 };
+        private static readonly int[] ElementsPerAxis3 = { 512, 16, 32 };
+        private static readonly int[] ElementsPerAxis4 = { 4096, 256 };
+        private static readonly double[] LengthPerAxis = { 20, 1, 1 };
 
-            Solve(() => GeometricMultigridSolver.CreateDeepV(model, false, GeometricMultigridSolver.MatrixType.CSR, iterations, false, convergenceTolerance, 2, 4));
-            Solve(() => GeometricMultigridSolver.CreateDeepV(model, false, GeometricMultigridSolver.MatrixType.DUVI, iterations, false, convergenceTolerance, 2, 4));
-            Solve(() => GeometricMultigridSolver.CreateDeepV(model, true, GeometricMultigridSolver.MatrixType.CSR, iterations, false, convergenceTolerance, 2, 4));
-            Solve(() => GeometricMultigridSolver.CreateDeepV(model, true, GeometricMultigridSolver.MatrixType.DUVI, iterations, false, convergenceTolerance, 2, 4));
+        public static IEnumerable<object[]> CantileverDataGM =>
+            new List<object[]>
+            {
+                new object[] { ElementsPerAxis1, LengthPerAxis, true,  false, 1, 1 },
+                new object[] { ElementsPerAxis1, LengthPerAxis, true,  true,  1, 1 },
+                new object[] { ElementsPerAxis1, LengthPerAxis, false, false, 1, 2 },
+                new object[] { ElementsPerAxis1, LengthPerAxis, false, true,  1, 2 },
+                new object[] { ElementsPerAxis1, LengthPerAxis, true,  false, 1, 2 },
+                new object[] { ElementsPerAxis1, LengthPerAxis, true,  true,  1, 2 },
+                new object[] { ElementsPerAxis1, LengthPerAxis, false, false, 1, 4 },
+                new object[] { ElementsPerAxis1, LengthPerAxis, false, true,  1, 4 },
+                new object[] { ElementsPerAxis1, LengthPerAxis, true,  false, 1, 4 },
+                new object[] { ElementsPerAxis1, LengthPerAxis, true,  true,  1, 4 },
+                new object[] { ElementsPerAxis1, LengthPerAxis, false, false, 1, 6 },
+                new object[] { ElementsPerAxis1, LengthPerAxis, false, true,  1, 6 },
+                new object[] { ElementsPerAxis1, LengthPerAxis, true,  false, 1, 6 },
+                new object[] { ElementsPerAxis1, LengthPerAxis, true,  true,  1, 6 },
+                new object[] { ElementsPerAxis1, LengthPerAxis, false, false, 1, 8 },
+                new object[] { ElementsPerAxis1, LengthPerAxis, false, true,  1, 8 },
+                new object[] { ElementsPerAxis1, LengthPerAxis, true,  false, 1, 8 },
+                new object[] { ElementsPerAxis1, LengthPerAxis, true,  true,  1, 8 },
+                new object[] { ElementsPerAxis1, LengthPerAxis, true,  false, 2, 1 },
+                new object[] { ElementsPerAxis1, LengthPerAxis, true,  true,  2, 1 },
+                new object[] { ElementsPerAxis1, LengthPerAxis, false, false, 2, 2 },
+                new object[] { ElementsPerAxis1, LengthPerAxis, false, true,  2, 2 },
+                new object[] { ElementsPerAxis1, LengthPerAxis, true,  false, 2, 2 },
+                new object[] { ElementsPerAxis1, LengthPerAxis, true,  true,  2, 2 },
+                new object[] { ElementsPerAxis1, LengthPerAxis, false, false, 2, 4 },
+                new object[] { ElementsPerAxis1, LengthPerAxis, false, true,  2, 4 },
+                new object[] { ElementsPerAxis1, LengthPerAxis, true,  false, 2, 4 },
+                new object[] { ElementsPerAxis1, LengthPerAxis, true,  true,  2, 4 },
+                new object[] { ElementsPerAxis1, LengthPerAxis, false, false, 2, 6 },
+                new object[] { ElementsPerAxis1, LengthPerAxis, false, true,  2, 6 },
+                new object[] { ElementsPerAxis1, LengthPerAxis, true,  false, 2, 6 },
+                new object[] { ElementsPerAxis1, LengthPerAxis, true,  true,  2, 6 },
+                new object[] { ElementsPerAxis1, LengthPerAxis, false, false, 2, 8 },
+                new object[] { ElementsPerAxis1, LengthPerAxis, false, true,  2, 8 },
+                new object[] { ElementsPerAxis1, LengthPerAxis, true,  false, 2, 8 },
+                new object[] { ElementsPerAxis1, LengthPerAxis, true,  true,  2, 8 },
+
+                new object[] { ElementsPerAxis2, LengthPerAxis, true,  false, 1, 1 },
+                new object[] { ElementsPerAxis2, LengthPerAxis, true,  true,  1, 1 },
+                new object[] { ElementsPerAxis2, LengthPerAxis, false, false, 1, 2 },
+                new object[] { ElementsPerAxis2, LengthPerAxis, false, true,  1, 2 },
+                new object[] { ElementsPerAxis2, LengthPerAxis, true,  false, 1, 2 },
+                new object[] { ElementsPerAxis2, LengthPerAxis, true,  true,  1, 2 },
+                new object[] { ElementsPerAxis2, LengthPerAxis, false, false, 1, 4 },
+                new object[] { ElementsPerAxis2, LengthPerAxis, false, true,  1, 4 },
+                new object[] { ElementsPerAxis2, LengthPerAxis, true,  false, 1, 4 },
+                new object[] { ElementsPerAxis2, LengthPerAxis, true,  true,  1, 4 },
+                new object[] { ElementsPerAxis2, LengthPerAxis, false, false, 1, 6 },
+                new object[] { ElementsPerAxis2, LengthPerAxis, false, true,  1, 6 },
+                new object[] { ElementsPerAxis2, LengthPerAxis, true,  false, 1, 6 },
+                new object[] { ElementsPerAxis2, LengthPerAxis, true,  true,  1, 6 },
+                new object[] { ElementsPerAxis2, LengthPerAxis, false, false, 1, 8 },
+                new object[] { ElementsPerAxis2, LengthPerAxis, false, true,  1, 8 },
+                new object[] { ElementsPerAxis2, LengthPerAxis, true,  false, 1, 8 },
+                new object[] { ElementsPerAxis2, LengthPerAxis, true,  true,  1, 8 },
+                new object[] { ElementsPerAxis2, LengthPerAxis, true,  false, 2, 1 },
+                new object[] { ElementsPerAxis2, LengthPerAxis, true,  true,  2, 1 },
+                new object[] { ElementsPerAxis2, LengthPerAxis, false, false, 2, 2 },
+                new object[] { ElementsPerAxis2, LengthPerAxis, false, true,  2, 2 },
+                new object[] { ElementsPerAxis2, LengthPerAxis, true,  false, 2, 2 },
+                new object[] { ElementsPerAxis2, LengthPerAxis, true,  true,  2, 2 },
+                new object[] { ElementsPerAxis2, LengthPerAxis, false, false, 2, 4 },
+                new object[] { ElementsPerAxis2, LengthPerAxis, false, true,  2, 4 },
+                new object[] { ElementsPerAxis2, LengthPerAxis, true,  false, 2, 4 },
+                new object[] { ElementsPerAxis2, LengthPerAxis, true,  true,  2, 4 },
+                new object[] { ElementsPerAxis2, LengthPerAxis, false, false, 2, 6 },
+                new object[] { ElementsPerAxis2, LengthPerAxis, false, true,  2, 6 },
+                new object[] { ElementsPerAxis2, LengthPerAxis, true,  false, 2, 6 },
+                new object[] { ElementsPerAxis2, LengthPerAxis, true,  true,  2, 6 },
+                new object[] { ElementsPerAxis2, LengthPerAxis, false, false, 2, 8 },
+                new object[] { ElementsPerAxis2, LengthPerAxis, false, true,  2, 8 },
+                new object[] { ElementsPerAxis2, LengthPerAxis, true,  false, 2, 8 },
+                new object[] { ElementsPerAxis2, LengthPerAxis, true,  true,  2, 8 },
+
+                new object[] { ElementsPerAxis3, LengthPerAxis, true,  false, 2, 1 },
+                new object[] { ElementsPerAxis3, LengthPerAxis, true,  true,  2, 1 },
+                new object[] { ElementsPerAxis3, LengthPerAxis, false, false, 2, 2 },
+                new object[] { ElementsPerAxis3, LengthPerAxis, false, true,  2, 2 },
+                new object[] { ElementsPerAxis3, LengthPerAxis, true,  false, 2, 2 },
+                new object[] { ElementsPerAxis3, LengthPerAxis, true,  true,  2, 2 },
+                new object[] { ElementsPerAxis3, LengthPerAxis, false, false, 2, 4 },
+                new object[] { ElementsPerAxis3, LengthPerAxis, false, true,  2, 4 },
+                new object[] { ElementsPerAxis3, LengthPerAxis, true,  false, 2, 4 },
+                new object[] { ElementsPerAxis3, LengthPerAxis, true,  true,  2, 4 },
+                new object[] { ElementsPerAxis3, LengthPerAxis, false, false, 2, 6 },
+                new object[] { ElementsPerAxis3, LengthPerAxis, false, true,  2, 6 },
+                new object[] { ElementsPerAxis3, LengthPerAxis, true,  false, 2, 6 },
+                new object[] { ElementsPerAxis3, LengthPerAxis, true,  true,  2, 6 },
+                new object[] { ElementsPerAxis3, LengthPerAxis, false, false, 2, 8 },
+                new object[] { ElementsPerAxis3, LengthPerAxis, false, true,  2, 8 },
+                new object[] { ElementsPerAxis3, LengthPerAxis, true,  false, 2, 8 },
+                new object[] { ElementsPerAxis3, LengthPerAxis, true,  true,  2, 8 },
+
+                new object[] { ElementsPerAxis4, LengthPerAxis, true,  false, 3, 1 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, true,  true,  3, 1 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, false, false, 3, 2 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, false, true,  3, 2 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, true,  false, 3, 2 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, true,  true,  3, 2 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, false, false, 3, 4 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, false, true,  3, 4 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, true,  false, 3, 4 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, true,  true,  3, 4 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, false, false, 3, 6 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, false, true,  3, 6 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, true,  false, 3, 6 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, true,  true,  3, 6 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, false, false, 3, 8 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, false, true,  3, 8 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, true,  false, 3, 8 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, true,  true,  3, 8 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, true,  false, 4, 1 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, true,  true,  4, 1 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, false, false, 4, 2 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, false, true,  4, 2 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, true,  false, 4, 2 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, true,  true,  4, 2 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, false, false, 4, 4 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, false, true,  4, 4 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, true,  false, 4, 4 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, true,  true,  4, 4 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, false, false, 4, 6 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, false, true,  4, 6 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, true,  false, 4, 6 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, true,  true,  4, 6 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, false, false, 4, 8 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, false, true,  4, 8 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, true,  false, 4, 8 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, true,  true,  4, 8 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, true,  false, 6, 1 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, true,  true,  6, 1 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, false, false, 6, 2 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, false, true,  6, 2 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, true,  false, 6, 2 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, true,  true,  6, 2 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, false, false, 6, 4 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, false, true,  6, 4 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, true,  false, 6, 4 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, true,  true,  6, 4 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, false, false, 6, 6 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, false, true,  6, 6 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, true,  false, 6, 6 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, true,  true,  6, 6 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, false, false, 6, 8 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, false, true,  6, 8 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, true,  false, 6, 8 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, true,  true,  6, 8 },
+            };
+
+        [Theory]
+        [MemberData(nameof(CantileverDataGM))]
+        public static void CheckCantileverSolutionDeepV(int[] elementsPerAxis, double[] lengthPerAxis,
+                                                                    bool GaussSeidel, bool DuVi,
+                                                                    int depth = 2, int iterationsPerLevel = 4,
+                                                                    int iterations = 2000, double convergenceTolerance = 1e-5)
+        {
+            IGeometricMultigridModel model = elementsPerAxis.Length == 3
+                 ? new FemCantilever3D(elementsPerAxis, lengthPerAxis)
+                 : new FemCantilever2D(elementsPerAxis, lengthPerAxis);
+
+            GeometricMultigridSolver.MatrixType mat = DuVi ? GeometricMultigridSolver.MatrixType.DUVI : GeometricMultigridSolver.MatrixType.CSR;
+
+            Solve(() => GeometricMultigridSolver.CreateDeepV(model, GaussSeidel, mat, iterations, false, convergenceTolerance, depth, iterationsPerLevel));
             Solve(model, iterations, convergenceTolerance); // CG
+        }
+
+
+        public static IEnumerable<object[]> CantileverDataCG =>
+            new List<object[]>
+            {
+                new object[] { ElementsPerAxis1, LengthPerAxis },
+                new object[] { ElementsPerAxis2, LengthPerAxis },
+                new object[] { ElementsPerAxis3, LengthPerAxis },
+                new object[] { ElementsPerAxis4, LengthPerAxis },
+            };
+        [Theory]
+        [MemberData(nameof(CantileverDataCG))]
+        public static void CheckCantileverSolutionCG(int[] elementsPerAxis, double[] lengthPerAxis,
+                                                                    int iterations = 2000, double convergenceTolerance = 1e-5)
+        {
+            IGeometricMultigridModel model = elementsPerAxis.Length == 3
+                 ? new FemCantilever3D(elementsPerAxis, lengthPerAxis)
+                 : new FemCantilever2D(elementsPerAxis, lengthPerAxis);
+           Solve(model, iterations, convergenceTolerance); // CG
         }
     }
 }
