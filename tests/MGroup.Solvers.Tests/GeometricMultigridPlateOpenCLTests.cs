@@ -1,135 +1,17 @@
-﻿using Compression.src.MGroup.Solvers.Multigrid;
+﻿using CASS.OpenCL;
+using Compression.src.MGroup.Solvers.Multigrid;
 using Compression.tests.MGroup.LinearAlgebra.Tests.TestData.SparseLinearSystems;
 using MGroup.LinearAlgebra.Iterative;
-using MGroup.LinearAlgebra.Iterative.ConjugateGradient;
-using MGroup.LinearAlgebra.Iterative.Stationary;
-using MGroup.LinearAlgebra.Iterative.Stationary.CSR;
-using MGroup.LinearAlgebra.Iterative.Termination.Convergence;
-using MGroup.LinearAlgebra.Iterative.Termination.Iterations;
-using MGroup.LinearAlgebra.Matrices;
-using MGroup.LinearAlgebra.Matrices.Builders;
 using MGroup.LinearAlgebra.Vectors;
+using MGroup.OCL;
 using System.Diagnostics;
 using Xunit;
 
 namespace Compression.tests.MGroup.Solvers.Tests
 {
-    public static class GeometricMultigridTests
+    public class GeometricMultigridPlateOpenCLTests
     {
-        [Fact]
-        public static void CheckCantilever2dSolutionV()
-        {
-            double convergenceTolerance = 1e-4;
-            int iterations = 100000;
-
-            //FemCantilever2D model = new FemCantilever2D(new int[] { 50, 5 }, new double[] { 20, 1, 1 }); // non power of 2 elements per axis
-            IGeometricMultigridModel model = new FemCantilever2D(new int[] { 256, 16 }, new double[] { 20, 1, 1 });
-
-            Solve(() => GeometricMultigridSolver.CreateSimpleV(model, false, GeometricMultigridSolver.MatrixType.CSR, iterations, false, convergenceTolerance));
-            Solve(() => GeometricMultigridSolver.CreateSimpleV(model, false, GeometricMultigridSolver.MatrixType.DUVI, iterations, false, convergenceTolerance));
-            Solve(() => GeometricMultigridSolver.CreateSimpleV(model, true, GeometricMultigridSolver.MatrixType.CSR, iterations, false, convergenceTolerance));
-            Solve(() => GeometricMultigridSolver.CreateSimpleV(model, true, GeometricMultigridSolver.MatrixType.DUVI, iterations, false, convergenceTolerance));
-        }
-
-        private static String logFilePath = "out.txt";
-
-        private static void Solve(Func<GeometricMultigridSolver> initializer)
-        {
-            Stopwatch stopwatch = new Stopwatch();
-            stopwatch.Restart();
-            GeometricMultigridSolver solver = initializer();
-            stopwatch.Stop();
-            double timeGMGI = stopwatch.Elapsed.TotalMilliseconds;
-            Vector? x = null;
-            stopwatch.Restart();
-            (x, IterativeStatistics stats, double[] time) = solver.Solve(x);
-            stopwatch.Stop();
-            double timeGMGS = stopwatch.Elapsed.TotalMilliseconds;
-
-            File.AppendAllText(logFilePath, $"\nRequired time for Geometric Multigrid: {timeGMGI + timeGMGS}ms\n");
-            File.AppendAllText(logFilePath, $"\tTarget machine: CPU with C#\n");
-            File.AppendAllText(logFilePath, $"\tMethod: {(solver.GaussSeidel ? "Gauss-Seidel" : "Jacobi")}\n");
-            File.AppendAllText(logFilePath, $"\tMatrix type: {(solver.MatType == GeometricMultigridSolver.MatrixType.CSR ? "CSR" : "DuVi")}\n");
-            File.AppendAllText(logFilePath, $"\tInitialization: {timeGMGI}ms\n");
-            File.AppendAllText(logFilePath, $"\tSolve: {timeGMGS}ms\n");
-            if (stats.HasConverged)
-                File.AppendAllText(logFilePath, $"\tCONVERGED after {stats.NumIterationsRequired} iterations and a residual of {stats.ConvergenceCriterion.value}\n");
-            else File.AppendAllText(logFilePath, $"\tNOT converged after {stats.NumIterationsRequired} iterations and a residual of {stats.ConvergenceCriterion.value}\n");
-            for (int i = 0; i < time.Length; ++i)
-                File.AppendAllText(logFilePath, $"\tLevel {i}: {time[i]}ms\n");
-
-            Xunit.Assert.True(stats.HasConverged);
-        }
-
-        private static void Solve(IGeometricMultigridModel model, int iterations, double convergenceTolerance)
-        {
-            Stopwatch stopwatch = new Stopwatch();
-            stopwatch.Restart();
-
-            // Initialization
-            (DokRowMajor A, Vector b) = model.CreateLinearSystem();
-            CsrMatrix stiffness = A.BuildCsrMatrix(true);
-            CGAlgorithm.Builder builder = new CGAlgorithm.Builder();
-            builder.ResidualTolerance = convergenceTolerance;
-            builder.MaxIterationsProvider = new FixedMaxIterationsProvider(iterations);
-            CGAlgorithm methodCG = builder.Build();
-
-            stopwatch.Stop();
-            double timeCGI = stopwatch.Elapsed.TotalMilliseconds;
-            Vector x = Vector.CreateZero(model.NumDofsFree);
-            stopwatch.Restart();
-            //TODO: IterativeStatistics stats = methodCG.Solve(stiffness, b, x, true);  // Solve
-            /// =============== REIMPLEMENT THE WHEEL FOR DEBUG PURPOSES
-            IterativeStatistics stats = new();
-            stats.HasConverged = false;
-            stats.NumIterationsRequired = iterations;
-            {
-                Vector M = Vector.CreateFromArray(stiffness.GetDiagonalAsArray());
-                for (int i = 0; i < M.Length; ++i)
-                    M.RawData[i] = 1 / M.RawData[i];
-                
-                Vector r = b.Copy();
-                r.SubtractIntoThis(stiffness.Multiply(x));
-                Vector z = M.MultiplyEntrywise(r);
-                Vector p = z.Copy();
-                double rz = r.DotProduct(z);
-
-                for (int iteration = 0; iteration < iterations; ++iteration)
-                {
-                    Vector Ap = stiffness.Multiply(p);
-                    double a = rz / p.DotProduct(Ap);
-                    x.AddIntoThis(p.Scale(a));
-                    r.AddIntoThis(Ap.Scale(-a));
-
-                    bool nobreak = false;
-                    for (int i = 0; i < r.Length; ++i)
-                        if (Math.Abs(r[i]) > convergenceTolerance) nobreak = true;
-                        else stats.ResidualNormRatioEstimation = Math.Abs(r[i]);
-                    if (!nobreak) { stats.HasConverged = true; stats.NumIterationsRequired = iteration; break; }
-
-                    z = M.MultiplyEntrywise(r);
-                    double rz2 = r.DotProduct(z);
-                    double beta = rz2 / rz;
-                    p.ScaleIntoThis(beta);
-                    p.AddIntoThis(z);
-                    rz = rz2;
-                }
-            }
-            /// =============== END REIMPLEMENTATION
-
-            stopwatch.Stop();
-            double timeCG = stopwatch.Elapsed.TotalMilliseconds;
-            File.AppendAllText(logFilePath, $"\nRequired time for CG with matrix type CSR: {timeCGI + timeCG}ms\n");
-            File.AppendAllText(logFilePath, $"\tTarget machine: CPU with C#\n");
-            File.AppendAllText(logFilePath, $"\tMethod: CG\n");
-            File.AppendAllText(logFilePath, $"\tMatrix type: CSR\n");
-            File.AppendAllText(logFilePath, $"\tInitialization: {timeCGI}ms\n");
-            File.AppendAllText(logFilePath, $"\tSolve: {timeCG}ms\n");
-            if (stats.HasConverged)
-                File.AppendAllText(logFilePath, $"\tCONVERGED after {stats.NumIterationsRequired} iterations and a residual of {stats.ResidualNormRatioEstimation}\n");
-            else File.AppendAllText(logFilePath, $"\tNOT converged after {stats.NumIterationsRequired} iterations and a residual of {stats.ResidualNormRatioEstimation}\n");
-
-        }
+        private readonly static string logFilePath = "out_plate.txt";
 
         private static readonly int[] ElementsPerAxis1 = { 256, 16 };
         private static readonly int[] ElementsPerAxis2 = { 256, 16, 16 };
@@ -137,7 +19,7 @@ namespace Compression.tests.MGroup.Solvers.Tests
         private static readonly int[] ElementsPerAxis4 = { 4096, 256 };
         private static readonly double[] LengthPerAxis = { 20, 1, 1 };
 
-        public static IEnumerable<object[]> CantileverDataGM =>
+        public static IEnumerable<object[]> PlateDataGM =>
             new List<object[]>
             {
                 new object[] { ElementsPerAxis1, LengthPerAxis, true,  false, 1, 1 },
@@ -290,40 +172,99 @@ namespace Compression.tests.MGroup.Solvers.Tests
             };
 
         [Theory]
-        [MemberData(nameof(CantileverDataGM))]
-        public static void CheckCantileverSolutionDeepV(int[] elementsPerAxis, double[] lengthPerAxis,
+        [MemberData(nameof(PlateDataGM))]
+        public static void CheckPlateSolutionDeepVWithOpenCL(int[] elementsPerAxis, double[] lengthPerAxis,
                                                                     bool GaussSeidel, bool DuVi,
                                                                     int depth = 2, int iterationsPerLevel = 4,
                                                                     int iterations = 2000, double convergenceTolerance = 1e-5)
         {
-            IGeometricMultigridModel model = elementsPerAxis.Length == 3
-                 ? new FemCantilever3D(elementsPerAxis, lengthPerAxis)
-                 : new FemCantilever2D(elementsPerAxis, lengthPerAxis);
+            Platform[] platforms = Platform.GetPlatforms();
+            Xunit.Assert.NotEmpty(platforms);
+            Device[] devices = platforms[0].GetDevices();     // select a platform to get devices
+            Xunit.Assert.NotEmpty(devices);
+            //Assert.True(devices[0].extensions.Contains("cl_khr_non_uniform_work_group")); // local_workgroup must be 1 because extension is not supported in my PC
+            //OpenCL context = new OpenCL(platforms[0].platformId, devices.Select(x => x.deviceId).ToArray());
+            OpenCL context = new(platforms[0].platformId, devices[0].deviceId);
 
-            GeometricMultigridSolver.MatrixType mat = DuVi ? GeometricMultigridSolver.MatrixType.DUVI : GeometricMultigridSolver.MatrixType.CSR;
+            IGeometricMultigridModel model = new FemPlate(elementsPerAxis, lengthPerAxis);
+            Device device = devices[0];
 
-            Solve(() => GeometricMultigridSolver.CreateDeepV(model, GaussSeidel, mat, iterations, false, convergenceTolerance, depth, iterationsPerLevel));
-            Solve(model, iterations, convergenceTolerance); // CG
+            Stopwatch stopwatch = new();
+            stopwatch.Restart();
+            IOpenCLGeometricMultigridSolver solver = DuVi
+                ? OpenCLDuViGeometricMultigridSolver.CreateDeepV(devices[0], context, model, GaussSeidel, iterations, true, convergenceTolerance, depth, iterationsPerLevel)
+                : OpenCLCsrGeometricMultigridSolver.CreateDeepV(devices[0], context, model, GaussSeidel, iterations, true, convergenceTolerance, depth, iterationsPerLevel);
+            stopwatch.Stop();
+            double timeGMGI = stopwatch.Elapsed.TotalMilliseconds;
+            Vector? x = null;
+            stopwatch.Restart();
+            (x, IterativeStatistics stats, double[] time) = solver.Solve(x);
+            stopwatch.Stop();
+            double timeGMGS = stopwatch.Elapsed.TotalMilliseconds;
+            solver.ReleaseOpenCLResources();
+            File.AppendAllText(logFilePath, $"\nRequired time for Geometric Multigrid: {timeGMGI + timeGMGS}ms\n");
+            File.AppendAllText(logFilePath, $"\tTarget machine: GPU {device.name}\n");
+            File.AppendAllText(logFilePath, $"\tMethod: {(GaussSeidel ? "Gauss-Seidel" : "Jacobi")}\n");
+            File.AppendAllText(logFilePath, $"\tMatrix type: {(DuVi ? "DuVi" : "CSR")}\n");
+            File.AppendAllText(logFilePath, $"\tDimensions: {model.Mesh.Dimension}\n");
+            File.AppendAllText(logFilePath, $"\tFree DoFs: {model.NumDofsFree}\n");
+            File.AppendAllText(logFilePath, $"\tDepth of V: {depth}\n");
+            File.AppendAllText(logFilePath, $"\tSmoother iterations: {iterationsPerLevel}\n");
+            File.AppendAllText(logFilePath, $"\tInitialization: {timeGMGI}ms\n");
+            File.AppendAllText(logFilePath, $"\tSolve: {timeGMGS}ms\n");
+            if (stats.HasConverged)
+                File.AppendAllText(logFilePath, $"\tCONVERGED after {stats.NumIterationsRequired} iterations and a residual of {stats.ConvergenceCriterion.value}\n");
+            else File.AppendAllText(logFilePath, $"\tNOT converged after {stats.NumIterationsRequired} iterations and a residual of {stats.ConvergenceCriterion.value}\n");
+            Xunit.Assert.True(stats.HasConverged);
+            //File.WriteAllText("result_vector_x.txt", string.Join("\n", x.RawData));
         }
 
-
-        public static IEnumerable<object[]> CantileverDataCG =>
-            new List<object[]>
-            {
-                new object[] { ElementsPerAxis1, LengthPerAxis },
-                new object[] { ElementsPerAxis2, LengthPerAxis },
-                new object[] { ElementsPerAxis3, LengthPerAxis },
-                new object[] { ElementsPerAxis4, LengthPerAxis },
-            };
         [Theory]
-        [MemberData(nameof(CantileverDataCG))]
-        public static void CheckCantileverSolutionCG(int[] elementsPerAxis, double[] lengthPerAxis,
-                                                                    int iterations = 2000, double convergenceTolerance = 1e-5)
+        [MemberData(
+            nameof(GeometricMultigridCantileverBeamTests.CantileverDataCG),
+            MemberType = typeof(GeometricMultigridCantileverBeamTests)
+        )]
+        public static void CheckPlateSolutionCGWithOpenCL(int[] elementsPerAxis, double[] lengthPerAxis)
         {
+            Platform[] platforms = Platform.GetPlatforms();
+            Xunit.Assert.NotEmpty(platforms);
+            Device[] devices = platforms[0].GetDevices();     // select a platform to get devices
+            Xunit.Assert.NotEmpty(devices);
+            //Assert.True(devices[0].extensions.Contains("cl_khr_non_uniform_work_group")); // local_workgroup must be 1 because extension is not supported in my PC
+            //OpenCL context = new OpenCL(platforms[0].platformId, devices.Select(x => x.deviceId).ToArray());
+            OpenCL context = new(platforms[0].platformId, devices[0].deviceId);
+
             IGeometricMultigridModel model = elementsPerAxis.Length == 3
-                 ? new FemCantilever3D(elementsPerAxis, lengthPerAxis)
-                 : new FemCantilever2D(elementsPerAxis, lengthPerAxis);
-           Solve(model, iterations, convergenceTolerance); // CG
+                ? new FemCantilever3D(elementsPerAxis, lengthPerAxis)
+                : new FemCantilever2D(elementsPerAxis, lengthPerAxis);
+
+            Device device = devices[0];
+            int iterations = 20000;
+            double convergenceTolerance = 1e-5;
+
+            Stopwatch stopwatch = new();
+            stopwatch.Restart();
+            OpenCLCsrPcgSolver solver = new(context, iterations, convergenceTolerance);
+            solver.Initialize(device, model);
+            stopwatch.Stop();
+            double timePCGI = stopwatch.Elapsed.TotalMilliseconds;
+            Vector? x = null;
+            stopwatch.Restart();
+            (x, IterativeStatistics stats) = solver.Solve(x);
+            stopwatch.Stop();
+            double timePCGS = stopwatch.Elapsed.TotalMilliseconds;
+            solver.ReleaseOpenCLResources();
+            File.AppendAllText(logFilePath, $"\nRequired time for PCG method with CSR matrix type: {timePCGI + timePCGS}ms\n");
+            File.AppendAllText(logFilePath, $"\tTarget machine: GPU {device.name}\n");
+            File.AppendAllText(logFilePath, $"\tDimensions: {model.Mesh.Dimension}\n");
+            File.AppendAllText(logFilePath, $"\tFree DoFs: {model.NumDofsFree}\n");
+            File.AppendAllText(logFilePath, $"\tInitialization: {timePCGI}ms\n");
+            File.AppendAllText(logFilePath, $"\tSolve: {timePCGS}ms\n");
+            if (stats.HasConverged)
+                File.AppendAllText(logFilePath, $"\tCONVERGED after {stats.NumIterationsRequired} iterations and a residual of {stats.ConvergenceCriterion.value}\n");
+            else File.AppendAllText(logFilePath, $"\tNOT converged after {stats.NumIterationsRequired} iterations and a residual of {stats.ConvergenceCriterion.value}\n");
+            Xunit.Assert.True(stats.HasConverged);
+            //File.WriteAllText("result_vector_x.txt", string.Join("\n", x.RawData));
         }
     }
 }

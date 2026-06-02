@@ -11,7 +11,7 @@ using Xunit;
 
 namespace Compression.tests.MGroup.Solvers.Tests
 {
-    public class GeometricMultigridTestsWithOpenCL
+    public class GeometricMultigridCantileverBeamOpenCLTests
     {
         [Fact]
         public void OpenCLTestInitializationAndRun()
@@ -56,12 +56,12 @@ namespace Compression.tests.MGroup.Solvers.Tests
             Xunit.Assert.True(c);
         }
 
-        private static String logFilePath = "out.txt";
+        internal static readonly String logFilePath = "out_cantilever.txt";
 
         [Theory]
         [MemberData(
-            nameof(GeometricMultigridTests.CantileverDataGM),
-            MemberType = typeof(GeometricMultigridTests)
+            nameof(GeometricMultigridCantileverBeamTests.CantileverDataGM),
+            MemberType = typeof(GeometricMultigridCantileverBeamTests)
         )]
         public static void CheckCantileverSolutionDeepVWithOpenCL(int[] elementsPerAxis, double[] lengthPerAxis,
                                                                     bool GaussSeidel, bool DuVi,
@@ -113,8 +113,8 @@ namespace Compression.tests.MGroup.Solvers.Tests
 
         [Theory]
         [MemberData(
-            nameof(GeometricMultigridTests.CantileverDataCG),
-            MemberType = typeof(GeometricMultigridTests)
+            nameof(GeometricMultigridCantileverBeamTests.CantileverDataCG),
+            MemberType = typeof(GeometricMultigridCantileverBeamTests)
         )]
         public static void CheckCantileverSolutionCGWithOpenCL(int[] elementsPerAxis, double[] lengthPerAxis)
         {

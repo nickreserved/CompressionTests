@@ -21,7 +21,7 @@
 //     ^
 //     |     
 //   width
-
+#if False
 using MGroup.Constitutive.Structural;
 using MGroup.Constitutive.Structural.BoundaryConditions;
 using MGroup.Constitutive.Structural.Planar;
@@ -169,3 +169,4 @@ namespace Compression.tests.MGroup.Solvers.Tests
         }
     }
 }
+#endif

@@ -31,12 +31,14 @@
     </PackageReference>
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="src\MGroup.Solvers\AlgebraicModel\" />
-  </ItemGroup>
-
 	<ItemGroup>
 		<CLFiles Include="src\MGroup.OCL\*.cl" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Compile Remove="src\MGroup.Solvers\AlgebraicModel\**" />
+	  <EmbeddedResource Remove="src\MGroup.Solvers\AlgebraicModel\**" />
+	  <None Remove="src\MGroup.Solvers\AlgebraicModel\**" />
 	</ItemGroup>
 
 	<Target Name="CopyCLFilesFlattened" AfterTargets="Build">
