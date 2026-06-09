@@ -3,6 +3,7 @@ namespace Compression.tests.MGroup.LinearAlgebra.Tests.TestData.SparseLinearSyst
     using Compression.src.MGroup.Solvers.Multigrid;
     using global::MGroup.LinearAlgebra.Matrices;
     using global::MGroup.LinearAlgebra.Vectors;
+    using global::MGroup.MSolve.Discretization.Meshes.Structured;
     using System;
 
     public class FemCantilever3D : FemCantileverBase
@@ -25,7 +26,7 @@ namespace Compression.tests.MGroup.LinearAlgebra.Tests.TestData.SparseLinearSyst
         /// For 3d mesh the entries are cantilever's length (0), width (1), height (2).</param>
         /// <exception cref="ArgumentException">If <paramref name="lengthPerAxis"/> has not 3 entries</exception>
         public FemCantilever3D(int[] numElementsPerAxis, double[] lengthPerAxis)
-            : base(new CartesianMesh3D(numElementsPerAxis, lengthPerAxis),
+            : base(new UniformCartesianMesh3D.Builder(new double[] { 0, 0, 0 }, lengthPerAxis, numElementsPerAxis).BuildMesh(),
                   lengthPerAxis[1] * lengthPerAxis[2] / 12 * lengthPerAxis[2] * lengthPerAxis[2]) { }
 
  
@@ -122,7 +123,7 @@ namespace Compression.tests.MGroup.LinearAlgebra.Tests.TestData.SparseLinearSyst
         protected override double[] CalcKnownDisplacementsForNode(double[] coords)
         {
             double x = coords[0];
-            double z = coords[2] - 0.5 * Mesh.LengthPerAxis[2];
+            double z = coords[2] - (Mesh.MaxCoordinates[2] - Mesh.MinCoordinates[2]) / 2;
             (double u, double w) = CalcDisplacementsEulerBernoulli(x, z);
             return new double[] { u, 0, w };
         }

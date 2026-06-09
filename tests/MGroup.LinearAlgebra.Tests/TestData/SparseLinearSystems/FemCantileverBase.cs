@@ -10,7 +10,7 @@ namespace Compression.tests.MGroup.LinearAlgebra.Tests.TestData.SparseLinearSyst
 
     abstract public class FemCantileverBase : IGeometricMultigridModel
     {
-        public CartesianMeshBase Mesh { get; }
+        public ICartesianMesh Mesh { get; }
         IStructuredMesh IStructuredModel.Mesh { get => Mesh; }
         public int NumDofsAll { get; private set; }
         public int NumDofsFree { get; private set; }
@@ -43,12 +43,12 @@ namespace Compression.tests.MGroup.LinearAlgebra.Tests.TestData.SparseLinearSyst
         /// For 1d mesh and 2d mesh the entries are cantilever's length (0), height (1), width (2)<br/>
         /// For 3d mesh the entries are cantilever's length (0), width (1), height (2).</param>
         /// <exception cref="ArgumentException">If <paramref name="lengthPerAxis"/> has not 3 entries</exception>
-        public FemCantileverBase(CartesianMeshBase mesh, double momentOfInertia)
+        public FemCantileverBase(ICartesianMesh mesh, double momentOfInertia)
         {
             Mesh = mesh;
             MomentOfInertia = momentOfInertia;
             NumDofsAll = Mesh.Dimension * Mesh.NumNodesTotal;
-            NumDofsFree = NumDofsAll - NumDofsAll / Mesh.NumNodesOnAxis(0); // nodes with x = 0 are constrained
+            NumDofsFree = NumDofsAll - NumDofsAll / Mesh.NumNodes[0]; // nodes with x = 0 are constrained
         }
         public (DokRowMajor A, Vector x, Vector b) CreateAndSolveLinearSystem()
         {
@@ -69,7 +69,7 @@ namespace Compression.tests.MGroup.LinearAlgebra.Tests.TestData.SparseLinearSyst
 
         protected (double u, double w) CalcDisplacementsEulerBernoulli(double x, double z)
         {
-            double L = Mesh.LengthPerAxis[0];
+            double L = Mesh.MaxCoordinates[0] - Mesh.MinCoordinates[0];
             double q = DistributedLoad;
             double E = ElasticityModulus;
             double I = MomentOfInertia;
@@ -108,7 +108,7 @@ namespace Compression.tests.MGroup.LinearAlgebra.Tests.TestData.SparseLinearSyst
         /// </summary>
         private int[] GetElementDofsGlobal(int[] elementIdx)
         {
-            int[] nodeIds = Mesh.GetNodeIdsOfElement(elementIdx);
+            int[] nodeIds = Mesh.GetElementConnectivity(elementIdx);
             var globalDofs = new int[NumDofsPerNode * nodeIds.Length];
             for (int i = 0; i < nodeIds.Length; ++i)
             {
@@ -185,7 +185,7 @@ namespace Compression.tests.MGroup.LinearAlgebra.Tests.TestData.SparseLinearSyst
 
         public IStructuredModel GenerateModel(int detail)
         {
-            int[] numElementsPerAxis = Mesh.NumElementsPerAxis;
+            int[] numElementsPerAxis = (int[])Mesh.NumElements.Clone();
             if (detail == 0) throw new ArgumentException("parameter 'detail' must not be 0");
             if (detail > 0)
                 for (int i = 0; i < numElementsPerAxis.Length; ++i)
@@ -197,7 +197,7 @@ namespace Compression.tests.MGroup.LinearAlgebra.Tests.TestData.SparseLinearSyst
                     if (numElementsPerAxis[i] > threshold) numElementsPerAxis[i] >>= -detail;
                     else numElementsPerAxis[i] = 1;
             }
-            return GenerateModel(numElementsPerAxis, Mesh.LengthPerAxis);
+            return GenerateModel(numElementsPerAxis, Mesh.MaxCoordinates.Zip(Mesh.MinCoordinates, (x, y) => x - y).ToArray());
         }
 
         public (DokRowMajor restrictionMatrix, DokRowMajor interpolationMatrix) CreateRestrictionAndInterpolationMatrix(IStructuredModel coarserModel)
@@ -217,8 +217,8 @@ namespace Compression.tests.MGroup.LinearAlgebra.Tests.TestData.SparseLinearSyst
             // influence is changing for every coarse node.
             bool rollingWindow = true; // can optimize for speed if false, but code for optimization didn't written.
             {
-                int[] numFinerElementsPerAxis = Mesh.NumElementsPerAxis;
-                int[] numCoarserElementsPerAxis = ((FemCantileverBase)coarserModel).Mesh.NumElementsPerAxis;
+                int[] numFinerElementsPerAxis = Mesh.NumElements;   //ref
+                int[] numCoarserElementsPerAxis = ((FemCantileverBase)coarserModel).Mesh.NumElements; //ref;
                 // for everyone of 2 or 3 axis, we calculate influence window size from finer Model to coarser.
                 for (int i = 0; i < Mesh.Dimension; ++i)
                 {
@@ -262,7 +262,7 @@ namespace Compression.tests.MGroup.LinearAlgebra.Tests.TestData.SparseLinearSyst
                             if (end[i] > numFinerNodesPerAxis[i]) end[i] = numFinerNodesPerAxis[i];
                         }
                         // the id of the coarser Model's node. multiplied by dofsPerNode gives the row of restriction matrix
-                        int coarserNodeId = coarserModel.Mesh.GetNodeID(a);
+                        int coarserNodeId = coarserModel.Mesh.GetNodeID(a[..Mesh.Dimension]);
                         int coarserDofBaseId = coarserNodeId * ((FemCantileverBase)coarserModel).NumDofsPerNode;
                         // sum for each row of restriction matrix. Because restriction matrix created row by row, it is scalar and it is applied on
                         // the end of each row
@@ -274,7 +274,7 @@ namespace Compression.tests.MGroup.LinearAlgebra.Tests.TestData.SparseLinearSyst
                                 for (w[1] = start[1]; w[1] < end[1]; ++w[1])
                                 {
                                     // the id of the finer Model's node. multiplied by dofsPerNode gives the column of restriction matrix
-                                    int finerNodeId = Mesh.GetNodeID(w);
+                                    int finerNodeId = Mesh.GetNodeID(w[..Mesh.Dimension]);
                                     int finerDofBaseId = finerNodeId * NumDofsPerNode;
 
                                     double nodeInfluence = 0;
@@ -337,10 +337,10 @@ namespace Compression.tests.MGroup.LinearAlgebra.Tests.TestData.SparseLinearSyst
 
         public IGeometricMultigridModel CreateCoarserModel()
         {
-            int[] numElementsPerAxis = Mesh.NumElementsPerAxis;
+            int[] numElementsPerAxis = (int[]) Mesh.NumElements.Clone();
             for (int i = 0; i < numElementsPerAxis.Length; ++i)
                 if (numElementsPerAxis[i] > 1) numElementsPerAxis[i] >>= 1;
-            return GenerateModel(numElementsPerAxis, Mesh.LengthPerAxis);
+            return GenerateModel(numElementsPerAxis, Mesh.MaxCoordinates.Zip(Mesh.MinCoordinates, (x, y) => x - y).ToArray());
         }
 
         public bool IsDofFree(int dof)

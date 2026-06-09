@@ -2,11 +2,7 @@ namespace Compression.tests.MGroup.LinearAlgebra.Tests.TestData.SparseLinearSyst
 {
     using Compression.src.MGroup.Solvers.Multigrid;
     using global::MGroup.LinearAlgebra.Matrices;
-    using global::MGroup.LinearAlgebra.Matrices.Builders;
-    using global::MGroup.LinearAlgebra.Vectors;
     using global::MGroup.MSolve.Discretization.Meshes.Structured;
-    using System;
-    using System.Linq;
 
     public class FemCantilever2D : FemCantileverBase
     {
@@ -14,7 +10,10 @@ namespace Compression.tests.MGroup.LinearAlgebra.Tests.TestData.SparseLinearSyst
         /// Number of nodes per node are 2 displacement dofs per node.
         /// </summary>
         public override int NumDofsPerNode { get => 2; }
-
+        /// <summary>
+        /// Depth of cantilever.
+        /// </summary>
+        public readonly double CantileverDepth;
 
         /// <summary>
         /// Creates a cantilever Model.
@@ -22,8 +21,11 @@ namespace Compression.tests.MGroup.LinearAlgebra.Tests.TestData.SparseLinearSyst
         /// <param name="numElementsPerAxis">Array with 2 entries. The number of elements on cantilever's length (0) and height (1) axis.</param>
         /// <param name="lengthPerAxis">Array with 3 entries. The entries are cantilever's length (0), height (1), width (2).</param>
         public FemCantilever2D(int[] numElementsPerAxis, double[] lengthPerAxis)
-            : base(new CartesianMesh2D(numElementsPerAxis, lengthPerAxis),
-                  lengthPerAxis[1] * lengthPerAxis[2] / 12 * lengthPerAxis[1] * lengthPerAxis[1]) {}
+            : base(new UniformCartesianMesh2D.Builder(new double[] { 0, 0 }, lengthPerAxis[..2], numElementsPerAxis).BuildMesh(),
+                  lengthPerAxis[1] * lengthPerAxis[2] / 12 * lengthPerAxis[1] * lengthPerAxis[1])
+        {
+            CantileverDepth = lengthPerAxis[2];
+        }
 
         protected override Matrix ElementStiffness()
         {
@@ -50,12 +52,12 @@ namespace Compression.tests.MGroup.LinearAlgebra.Tests.TestData.SparseLinearSyst
         protected override double[] CalcKnownDisplacementsForNode(double[] coords)
         {
             double x = coords[0];
-            double z = coords[1] - 0.5 * Mesh.LengthPerAxis[1];
+            double z = coords[1] - (Mesh.MaxCoordinates[1] - Mesh.MinCoordinates[1]) / 2;
             (double u, double w) = CalcDisplacementsEulerBernoulli(x, z);
             return new double[] { u, w };
         }
 
         public override IGeometricMultigridModel GenerateModel(int[] numElementsPerAxis, double[] lengthPerAxis)
-        { return new FemCantilever2D(numElementsPerAxis, lengthPerAxis); }
+        { return new FemCantilever2D(numElementsPerAxis, lengthPerAxis.Append(CantileverDepth).ToArray()); }
     }
 }
