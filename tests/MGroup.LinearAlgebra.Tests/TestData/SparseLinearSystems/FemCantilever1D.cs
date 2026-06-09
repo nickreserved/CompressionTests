@@ -1,6 +1,5 @@
 namespace Compression.tests.MGroup.LinearAlgebra.Tests.TestData.SparseLinearSystems
 {
-    using Compression.src.MGroup.Solvers.Multigrid;
     using global::MGroup.LinearAlgebra.Matrices;
     using global::MGroup.MSolve.Discretization.Meshes.Structured;
     using System;
@@ -25,7 +24,7 @@ namespace Compression.tests.MGroup.LinearAlgebra.Tests.TestData.SparseLinearSyst
         protected override Matrix ElementStiffness() => throw new NotImplementedException();
         protected override double[] CalcKnownDisplacementsForNode(double[] coords) => throw new NotImplementedException();
 
-        public override IGeometricMultigridModel GenerateModel(int[] numElementsPerAxis, double[] lengthPerAxis)
+        protected override FemCantilever1D GenerateModel(int[] numElementsPerAxis, double[] lengthPerAxis)
         { return new FemCantilever1D(numElementsPerAxis, lengthPerAxis);  }
     }
 }

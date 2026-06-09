@@ -219,13 +219,13 @@ namespace Compression.src.MGroup.Solvers.Multigrid
             interpolation = new IMatrixView[totalLevels - 1];
             if (!GaussSeidel) RelJacobiPreconditioner = new Vector[totalLevels - 1];
             (DokRowMajor A, b) = Model.CreateLinearSystem();
-            IGeometricMultigridModel currentModel = Model;
+            IGeometricMultigridModel model = Model;
             for (int i = 0; i < totalLevels - 1; ++i)
             {
                 //if (!GaussSeidel) HealVector[i] = HealStiffnessMatrix(A.RawRows);
                 if (!GaussSeidel) RelJacobiPreconditioner[i] = coarseRelaxation ? JacobiPreconditioner(A.RawRows)
                                                                                 : RelaxedJacobiPreconditioner(A.RawRows);
-                (currentModel, DokRowMajor restrictionB, DokRowMajor interpolationB) = currentModel.CreateCoarserModelAndSmoothenerMatrices();
+                (model, DokRowMajor restrictionB, DokRowMajor interpolationB) = IGeometricMultigridModel.CreateCoarserModelAndSmoothenerMatrices(model);
                 switch(matType)
                 {
                     case MatrixType.CSR:
@@ -239,7 +239,7 @@ namespace Compression.src.MGroup.Solvers.Multigrid
                         interpolation[i] = new DuViCompressedSparseMatrix(interpolationB);
                         break;
                 }
-                (A, _) = currentModel.CreateLinearSystem();
+                (A, _) = model.CreateLinearSystem();
             }
             if (!GaussSeidel && coarseRelaxation) RelaxateJacobiPreconditioners(A, RelJacobiPreconditioner);
             coarseStiffnessLdlFactorized = SkylineMatrix.CreateFromMatrix(A.BuildCsrMatrix(true).CopyToFullMatrix(), 1e-15).FactorLdl(true, 1e-15);

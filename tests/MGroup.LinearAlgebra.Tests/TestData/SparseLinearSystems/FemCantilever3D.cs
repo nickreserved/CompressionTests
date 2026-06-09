@@ -1,6 +1,5 @@
 namespace Compression.tests.MGroup.LinearAlgebra.Tests.TestData.SparseLinearSystems
 {
-    using Compression.src.MGroup.Solvers.Multigrid;
     using global::MGroup.LinearAlgebra.Matrices;
     using global::MGroup.LinearAlgebra.Vectors;
     using global::MGroup.MSolve.Discretization.Meshes.Structured;
@@ -128,7 +127,7 @@ namespace Compression.tests.MGroup.LinearAlgebra.Tests.TestData.SparseLinearSyst
             return new double[] { u, 0, w };
         }
 
-        public override IGeometricMultigridModel GenerateModel(int[] numElementsPerAxis, double[] lengthPerAxis)
+        protected override FemCantilever3D GenerateModel(int[] numElementsPerAxis, double[] lengthPerAxis)
         { return new FemCantilever3D(numElementsPerAxis, lengthPerAxis); }
     }
 }

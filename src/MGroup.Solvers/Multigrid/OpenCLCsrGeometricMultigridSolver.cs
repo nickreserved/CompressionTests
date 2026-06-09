@@ -159,7 +159,7 @@ namespace Compression.src.MGroup.Solvers.Multigrid
             LevelDoFs[0] = A.NumRows;
             for (int i = 0; i < totalLevels - 1; ++i)
             {
-                (model, DokRowMajor restrictionB, DokRowMajor interpolationB) = model.CreateCoarserModelAndSmoothenerMatrices();
+                (model, DokRowMajor restrictionB, DokRowMajor interpolationB) = IGeometricMultigridModel.CreateCoarserModelAndSmoothenerMatrices(model);
                 LevelDoFs[i + 1] = restrictionB.NumRows;
                 preconditioners[i] = coarseRelaxation ? GeometricMultigridSolver.JacobiPreconditioner(A.RawRows)
                                                         : GeometricMultigridSolver.RelaxedJacobiPreconditioner(A.RawRows);
