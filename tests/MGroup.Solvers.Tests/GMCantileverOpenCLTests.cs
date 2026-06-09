@@ -11,17 +11,12 @@ using Xunit;
 
 namespace Compression.tests.MGroup.Solvers.Tests
 {
-    public class GeometricMultigridCantileverBeamOpenCLTests
+    public class GMCantileverOpenCLTests
     {
         [Fact]
         public void OpenCLTestInitializationAndRun()
         {
-            Platform[] platforms = Platform.GetPlatforms();
-            Xunit.Assert.NotEmpty(platforms);
-            Device[] devices = platforms[0].GetDevices();     // select a platform to get devices
-            Xunit.Assert.NotEmpty(devices);
-            OpenCL context = new(platforms[0].platformId, /*devices[0].deviceId*/devices.Select(x => x.deviceId).ToArray());
-
+            (OpenCL context, _) = InitializeOpenCL();
             CLProgram program = Program.CreateProgram(context, "CsrGeometricMultigrid", "-cl-std=CL2.0");
             CLKernel kernel = context.CreateKernel(program, "matrix_vector_product");
             CLCommandQueue commandQueue = context.CreateCommandQueue(context.Devices[0]);
@@ -56,36 +51,36 @@ namespace Compression.tests.MGroup.Solvers.Tests
             Xunit.Assert.True(c);
         }
 
-        internal static readonly String logFilePath = "out_cantilever.txt";
+        internal static readonly String logFilePath = "out.txt";
 
         [Theory]
         [MemberData(
-            nameof(GeometricMultigridCantileverBeamTests.CantileverDataGM),
-            MemberType = typeof(GeometricMultigridCantileverBeamTests)
+            nameof(GMCantileverTests.CantileverDataGM),
+            MemberType = typeof(GMCantileverTests)
         )]
         public static void CheckCantileverSolutionDeepVWithOpenCL(int[] elementsPerAxis, double[] lengthPerAxis,
                                                                     bool GaussSeidel, bool DuVi,
-                                                                    int depth = 2, int iterationsPerLevel = 4,
-                                                                    int iterations = 2000, double convergenceTolerance = 1e-5)
+                                                                    int depth = 2, int iterationsPerLevel = 4)
         {
-            Platform[] platforms = Platform.GetPlatforms();
-            Xunit.Assert.NotEmpty(platforms);
-            Device[] devices = platforms[0].GetDevices();     // select a platform to get devices
-            Xunit.Assert.NotEmpty(devices);
-            //Assert.True(devices[0].extensions.Contains("cl_khr_non_uniform_work_group")); // local_workgroup must be 1 because extension is not supported in my PC
-            //OpenCL context = new OpenCL(platforms[0].platformId, devices.Select(x => x.deviceId).ToArray());
-            OpenCL context = new(platforms[0].platformId, devices[0].deviceId);
-
             IGeometricMultigridModel model = elementsPerAxis.Length == 3
                 ? new FemCantilever3D(elementsPerAxis, lengthPerAxis)
                 : new FemCantilever2D(elementsPerAxis, lengthPerAxis);
-            Device device = devices[0];
+            CheckSolutionDeepVWithOpenCL(model, GaussSeidel, DuVi, depth, iterationsPerLevel);
+        }
+
+        internal static void CheckSolutionDeepVWithOpenCL(IGeometricMultigridModel model,
+                                                          bool GaussSeidel, bool DuVi,
+                                                          int depth = 2, int iterationsPerLevel = 4)
+        {
+            (OpenCL context, Device device) = InitializeOpenCL();
+            int iterations = 20000;
+            double convergenceTolerance = 1e-5;
 
             Stopwatch stopwatch = new();
             stopwatch.Restart();
             IOpenCLGeometricMultigridSolver solver = DuVi
-                ? OpenCLDuViGeometricMultigridSolver.CreateDeepV(devices[0], context, model, GaussSeidel, iterations, true, convergenceTolerance, depth, iterationsPerLevel)
-                : OpenCLCsrGeometricMultigridSolver.CreateDeepV(devices[0], context, model, GaussSeidel, iterations, true, convergenceTolerance, depth, iterationsPerLevel);
+                ? OpenCLDuViGeometricMultigridSolver.CreateDeepV(device, context, model, GaussSeidel, iterations, true, convergenceTolerance, depth, iterationsPerLevel)
+                : OpenCLCsrGeometricMultigridSolver.CreateDeepV(device, context, model, GaussSeidel, iterations, true, convergenceTolerance, depth, iterationsPerLevel);
             stopwatch.Stop();
             double timeGMGI = stopwatch.Elapsed.TotalMilliseconds;
             Vector? x = null;
@@ -113,24 +108,20 @@ namespace Compression.tests.MGroup.Solvers.Tests
 
         [Theory]
         [MemberData(
-            nameof(GeometricMultigridCantileverBeamTests.CantileverDataCG),
-            MemberType = typeof(GeometricMultigridCantileverBeamTests)
+            nameof(GMCantileverTests.CantileverDataCG),
+            MemberType = typeof(GMCantileverTests)
         )]
         public static void CheckCantileverSolutionCGWithOpenCL(int[] elementsPerAxis, double[] lengthPerAxis)
         {
-            Platform[] platforms = Platform.GetPlatforms();
-            Xunit.Assert.NotEmpty(platforms);
-            Device[] devices = platforms[0].GetDevices();     // select a platform to get devices
-            Xunit.Assert.NotEmpty(devices);
-            //Assert.True(devices[0].extensions.Contains("cl_khr_non_uniform_work_group")); // local_workgroup must be 1 because extension is not supported in my PC
-            //OpenCL context = new OpenCL(platforms[0].platformId, devices.Select(x => x.deviceId).ToArray());
-            OpenCL context = new(platforms[0].platformId, devices[0].deviceId);
-
             IGeometricMultigridModel model = elementsPerAxis.Length == 3
                 ? new FemCantilever3D(elementsPerAxis, lengthPerAxis)
                 : new FemCantilever2D(elementsPerAxis, lengthPerAxis);
+            CheckSolutionCGWithOpenCL(model);
+        }
 
-            Device device = devices[0];
+        internal static void CheckSolutionCGWithOpenCL(IGeometricMultigridModel model)
+        {
+            (OpenCL context, Device device) = InitializeOpenCL();
             int iterations = 20000;
             double convergenceTolerance = 1e-5;
 
@@ -157,6 +148,19 @@ namespace Compression.tests.MGroup.Solvers.Tests
             else File.AppendAllText(logFilePath, $"\tNOT converged after {stats.NumIterationsRequired} iterations and a residual of {stats.ConvergenceCriterion.value}\n");
             Xunit.Assert.True(stats.HasConverged);
             //File.WriteAllText("result_vector_x.txt", string.Join("\n", x.RawData));
+        }
+
+        internal static (OpenCL, Device) InitializeOpenCL()
+        {
+            Platform[] platforms = Platform.GetPlatforms();
+            Xunit.Assert.NotEmpty(platforms);
+            Device[] devices = platforms[0].GetDevices();     // select a platform to get devices
+            Xunit.Assert.NotEmpty(devices);
+            //Assert.True(devices[0].extensions.Contains("cl_khr_non_uniform_work_group")); // local_workgroup must be 1 because extension is not supported in my PC
+            //OpenCL context = new OpenCL(platforms[0].platformId, devices.Select(x => x.deviceId).ToArray());
+            OpenCL context = new(platforms[0].platformId, devices[0].deviceId);
+            Device device = devices[0];
+            return (context, device);
         }
     }
 }

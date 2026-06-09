@@ -24,7 +24,7 @@ namespace Compression.tests.MGroup.LinearAlgebra.Tests.TestData.SparseLinearSyst
         public UniformCartesianMesh2D Mesh { get; }
         IStructuredMesh IGeometricMultigridModel.Mesh { get => Mesh; }
 
-        protected Model model;
+        private readonly Model model;
 
         public int NumDofsAll { get; private set; }
 
@@ -37,8 +37,6 @@ namespace Compression.tests.MGroup.LinearAlgebra.Tests.TestData.SparseLinearSyst
 
         public (DokRowMajor A, Vector b) CreateLinearSystem()
         { 
-            if (model == null) model = CreateModel(Mesh, Thickness, ElasticityModulus, PoissonRatio, DistributedLoad);
-
             var solverFactory = new PcgSolver.Factory();
             //var solverFactory = new LdlSkylineSolver.Factory();
             var algebraicModel = solverFactory.BuildAlgebraicModel(model);
@@ -73,6 +71,7 @@ namespace Compression.tests.MGroup.LinearAlgebra.Tests.TestData.SparseLinearSyst
                                 curDofId++;                 // curNodeId == node.ID, so TRANSLATE_Z is fixed and not stored in freeDofs
                 freeDofs[n++] = curDofId++;
                 freeDofs[n++] = curDofId++;
+                curNodeId++;
             }
             for (; curNodeId < Mesh.NumNodesTotal; ++curNodeId)        // curNodeId > last(node.ID)
             {
@@ -88,7 +87,8 @@ namespace Compression.tests.MGroup.LinearAlgebra.Tests.TestData.SparseLinearSyst
         {
             int[] numElementsPerAxis = (int[])Mesh.NumElements.Clone();
             IGeometricMultigridModel.MakeCartesianCoarserElementsPerAxis(numElementsPerAxis);
-            return new FemPlate(numElementsPerAxis, Mesh.MaxCoordinates.Zip(Mesh.MinCoordinates, (x, y) => x - y).Append(Thickness).ToArray());
+            return new FemPlate(numElementsPerAxis, Mesh.MaxCoordinates.Zip(Mesh.MinCoordinates, (x, y) => x - y).Append(Thickness).ToArray(),
+                                   ElasticityModulus, PoissonRatio, DistributedLoad);
         }
 
         /// <summary>
@@ -96,15 +96,21 @@ namespace Compression.tests.MGroup.LinearAlgebra.Tests.TestData.SparseLinearSyst
         /// </summary>
         /// <param name="numElementsPerAxis">Array with 2 entries. The number of elements on cantilever's length (0) and height (1) axis.</param>
         /// <param name="lengthPerAxis">Array with 3 entries. The entries are cantilever's length (0), height (1), width (2).</param>
-        public FemPlate(int[] numElementsPerAxis, double[] lengthPerAxis)
+        /// <param name="E">Elasticity (Young) modulus in ΚΝ</param>
+        /// <param name="v">Poisson's ratio</param>
+        /// <param name="q">Distributed load in KN/m²</param>
+        public FemPlate(int[] numElementsPerAxis, double[] lengthPerAxis, double E, double v, double q)
         {
             Mesh = new UniformCartesianMesh2D.Builder(new double[] { 0, 0 }, lengthPerAxis[..2], numElementsPerAxis).BuildMesh();
             Thickness = lengthPerAxis[2];
+            ElasticityModulus = E; PoissonRatio = v;
+            DistributedLoad = q;
             NumDofsAll = NumDofsPerNode * Mesh.NumNodesTotal;
             NumDofsFree = NumDofsAll
                 - 2 * Mesh.NumNodes[1]    // 2 rows with constant x has its TRANSLATE_Z (only) fixed
                 - 3 * Mesh.NumNodes[0]    // 3 rows with constant y has its TRANSLATE_Z (only) fixed
                 + 6;                      // 2*3 intersection points with constant y AND constant x counted twise
+            model = CreateModel(Mesh, Thickness, ElasticityModulus, PoissonRatio, DistributedLoad);
         }
 
         private static Model CreateModel(UniformCartesianMesh2D mesh, double Thickness,
@@ -112,14 +118,6 @@ namespace Compression.tests.MGroup.LinearAlgebra.Tests.TestData.SparseLinearSyst
                                                                               double DistributedLoad)
         {
             const int subdomainID = 0;
-            // Problem properties
-            //double Lx = 3.0;
-            //double Ly = 2.0;
-            //double E = 52416; //2E6
-            //double v = 0.3; //0.25
-            //int numElemX = 48;
-            //int numElemY = 32;
-            //double q = -10; 
 
             // Nodes
             var model = new Model();
