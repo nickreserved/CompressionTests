@@ -1,5 +1,4 @@
 ﻿using Compression.src.MGroup.LinearAlgebra.Iterative.Stationary;
-using DotNumerics.LinearAlgebra.CSLapack;
 using MGroup.LinearAlgebra.Iterative;
 using MGroup.LinearAlgebra.Iterative.Stationary;
 using MGroup.LinearAlgebra.Iterative.Stationary.CSR;
@@ -77,15 +76,16 @@ namespace Compression.src.MGroup.Solvers.Multigrid
 
 
         // calculate with power method -- only for tests -- it is inefficient
-        private double EigenValueUpperBound(DokRowMajor AA)
+        private static double EigenValueUpperBound(DokRowMajor AA, Vector Adiag)
         {
-            const double percent = 0.1;
+            const double percent = 0.001;
             CsrMatrix A = AA.ConvertToCsr();
             Vector x = Vector.CreateWithValue(A.NumRows, 1 / Math.Sqrt(A.NumRows));
             double l = 1;
             for (; ; )
             {
                 Vector y = A.Multiply(x);
+                y.MultiplyEntrywiseIntoThis(Adiag);
                 double l2 = y.Norm2();
                 x = y.Scale(1 / l2);
                 double ratio = l2 / l;
@@ -97,6 +97,19 @@ namespace Compression.src.MGroup.Solvers.Multigrid
                 }
             }
             return l;
+        }
+        /// <summary>
+        /// Over- or under-relaxate the Jacobi preconditioner.
+        /// </summary>
+        /// <param name="A">The matrix as array of row dictionaries.</param>
+        /// <return>The Jacobi preconditioner of matrix <paramref name="A"/>, over- or under-relaxed <c>w * D^-1</c>.</return>
+        private static Vector RelaxedJacobiPreconditioner(DokRowMajor A)
+        {
+            Vector v = JacobiPreconditioner(A.RawRows);
+            // This is a slow calculation of major eigenvalue of A with power method.
+            double l = EigenValueUpperBound(A, v); // calculate upper bound of eigenvalues
+            RelaxateJacobiPreconditioner(v, l);
+            return v;
         }
 
         /// <summary>
@@ -124,7 +137,8 @@ namespace Compression.src.MGroup.Solvers.Multigrid
         {
             double l = 0;   // max eigenvalue
             for (int i = 0; i < rows.Length; ++i)
-                l = Math.Max(l, rows[i].Values.Select(v => Math.Abs(v)).Sum() / Math.Abs(rows[i][i])); // approximation of max eigenvalue
+                //l = Math.Max(l, rows[i].Values.Select(v => Math.Abs(v)).Sum() / Math.Abs(rows[i][i])); // approximation of max eigenvalue
+                l = Math.Max(l, rows[i].Values.Select(v => Math.Abs(v)).Sum() / rows[i].Values.Select(v => Math.Abs(v)).Max()); // approximation of max eigenvalue
             return l;
         }
 
@@ -186,6 +200,7 @@ namespace Compression.src.MGroup.Solvers.Multigrid
         internal static Vector RelaxedJacobiPreconditioner(Dictionary<int, double>[] A)
         {
             Vector v = JacobiPreconditioner(A);
+            // This is a coarse calculation of major eigenvalue of A.
             double l = EigenValueUpperBound(A); // calculate upper bound of eigenvalues
             RelaxateJacobiPreconditioner(v, l);
             return v;
@@ -224,7 +239,7 @@ namespace Compression.src.MGroup.Solvers.Multigrid
             {
                 //if (!GaussSeidel) HealVector[i] = HealStiffnessMatrix(A.RawRows);
                 if (!GaussSeidel) RelJacobiPreconditioner[i] = coarseRelaxation ? JacobiPreconditioner(A.RawRows)
-                                                                                : RelaxedJacobiPreconditioner(A.RawRows);
+                                                                                : RelaxedJacobiPreconditioner(A.RawRows);//TODO: A.RawRows
                 (model, DokRowMajor restrictionB, DokRowMajor interpolationB) = IGeometricMultigridModel.CreateCoarserModelAndSmoothenerMatrices(model);
                 switch(matType)
                 {

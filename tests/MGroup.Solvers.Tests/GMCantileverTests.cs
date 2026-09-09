@@ -14,9 +14,36 @@ namespace Compression.tests.MGroup.Solvers.Tests
 {
     public static class GMCantileverTests
     {
+        // ==================== GM
+
+
+        /// <summary>
+        /// Geometric Multigrid test for cantilever.
+        /// </summary>
+        /// <remarks>
+        /// <list type="bullet">
+        /// <item>Cantilever with quad elements</item>
+        /// <item>Geometric multigrid with simple V</item>
+        /// <item>2 type of matrices: DUVI and CSR</item>
+        /// <item>2 type of smoothers: Jacobi and Gauss-Seidel</item>
+        /// </list>
+        /// </remarks>
         [Fact]
-        public static void CheckCantilever2dSolutionV() => CheckSolutionV(new FemCantilever2D(new int[] { 256, 16 }, new double[] { 20, 1, 1 }));
-        
+        public static void CheckCantilever2dSolutionV() => CheckSolutionV(new FemCantilever2D(ElementsPerAxis1, LengthPerAxis));
+
+        /// <summary>
+        /// Geometric Multigrid test for any type of model.
+        /// </summary>
+        /// <remarks>
+        /// This function is used from both cantilever and plate (or any other addition in the future).
+        /// <list type="bullet">
+        /// <item>Any type of model</item>
+        /// <item>Geometric multigrid with simple V</item>
+        /// <item>2 type of matrices: DUVI and CSR</item>
+        /// <item>2 type of smoothers: Jacobi and Gauss-Seidel</item>
+        /// </list>
+        /// </remarks>
+        /// <param name="model">The model.</param>
         internal static void CheckSolutionV(IGeometricMultigridModel model)
         {
             double convergenceTolerance = 1e-4;
@@ -28,6 +55,13 @@ namespace Compression.tests.MGroup.Solvers.Tests
             Solve(() => GeometricMultigridSolver.CreateSimpleV(model, true, GeometricMultigridSolver.MatrixType.DUVI, iterations, false, convergenceTolerance));
         }
 
+        /// <summary>
+        /// Solver for Geometric Multigrid with any configuration.
+        /// </summary>
+        /// <remarks>
+        /// This function is used from both cantilever and plate (or any other addition in the future).
+        /// </remarks>
+        /// <param name="initializer">A lambda expression with no parameters, which returns a GeometricMultigridSolver object.</param>
         internal static void Solve(Func<GeometricMultigridSolver> initializer)
         {
             Stopwatch stopwatch = new Stopwatch();
@@ -56,75 +90,7 @@ namespace Compression.tests.MGroup.Solvers.Tests
             Xunit.Assert.True(stats.HasConverged);
         }
 
-        internal static void Solve(IGeometricMultigridModel model, int iterations, double convergenceTolerance)
-        {
-            Stopwatch stopwatch = new Stopwatch();
-            stopwatch.Restart();
 
-            // Initialization
-            (DokRowMajor A, Vector b) = model.CreateLinearSystem();
-            CsrMatrix stiffness = A.BuildCsrMatrix(true);
-            CGAlgorithm.Builder builder = new CGAlgorithm.Builder();
-            builder.ResidualTolerance = convergenceTolerance;
-            builder.MaxIterationsProvider = new FixedMaxIterationsProvider(iterations);
-            CGAlgorithm methodCG = builder.Build();
-
-            stopwatch.Stop();
-            double timeCGI = stopwatch.Elapsed.TotalMilliseconds;
-            Vector x = Vector.CreateZero(model.NumDofsFree);
-            stopwatch.Restart();
-            //TODO: IterativeStatistics stats = methodCG.Solve(stiffness, b, x, true);  // Solve
-            /// =============== REIMPLEMENT THE WHEEL FOR DEBUG PURPOSES
-            IterativeStatistics stats = new();
-            stats.HasConverged = false;
-            stats.NumIterationsRequired = iterations;
-            {
-                Vector M = Vector.CreateFromArray(stiffness.GetDiagonalAsArray());
-                for (int i = 0; i < M.Length; ++i)
-                    M.RawData[i] = 1 / M.RawData[i];
-                
-                Vector r = b.Copy();
-                r.SubtractIntoThis(stiffness.Multiply(x));
-                Vector z = M.MultiplyEntrywise(r);
-                Vector p = z.Copy();
-                double rz = r.DotProduct(z);
-
-                for (int iteration = 0; iteration < iterations; ++iteration)
-                {
-                    Vector Ap = stiffness.Multiply(p);
-                    double a = rz / p.DotProduct(Ap);
-                    x.AddIntoThis(p.Scale(a));
-                    r.AddIntoThis(Ap.Scale(-a));
-
-                    bool nobreak = false;
-                    for (int i = 0; i < r.Length; ++i)
-                        if (Math.Abs(r[i]) > convergenceTolerance) nobreak = true;
-                        else stats.ResidualNormRatioEstimation = Math.Abs(r[i]);
-                    if (!nobreak) { stats.HasConverged = true; stats.NumIterationsRequired = iteration; break; }
-
-                    z = M.MultiplyEntrywise(r);
-                    double rz2 = r.DotProduct(z);
-                    double beta = rz2 / rz;
-                    p.ScaleIntoThis(beta);
-                    p.AddIntoThis(z);
-                    rz = rz2;
-                }
-            }
-            /// =============== END REIMPLEMENTATION
-
-            stopwatch.Stop();
-            double timeCG = stopwatch.Elapsed.TotalMilliseconds;
-            File.AppendAllText(GMCantileverOpenCLTests.logFilePath, $"\nRequired time for CG with matrix type CSR: {timeCGI + timeCG}ms\n");
-            File.AppendAllText(GMCantileverOpenCLTests.logFilePath, $"\tTarget machine: CPU with C#\n");
-            File.AppendAllText(GMCantileverOpenCLTests.logFilePath, $"\tMethod: CG\n");
-            File.AppendAllText(GMCantileverOpenCLTests.logFilePath, $"\tMatrix type: CSR\n");
-            File.AppendAllText(GMCantileverOpenCLTests.logFilePath, $"\tInitialization: {timeCGI}ms\n");
-            File.AppendAllText(GMCantileverOpenCLTests.logFilePath, $"\tSolve: {timeCG}ms\n");
-            if (stats.HasConverged)
-                File.AppendAllText(GMCantileverOpenCLTests.logFilePath, $"\tCONVERGED after {stats.NumIterationsRequired} iterations and a residual of {stats.ResidualNormRatioEstimation}\n");
-            else File.AppendAllText(GMCantileverOpenCLTests.logFilePath, $"\tNOT converged after {stats.NumIterationsRequired} iterations and a residual of {stats.ResidualNormRatioEstimation}\n");
-
-        }
 
         private static readonly int[] ElementsPerAxis1 = { 256, 16 };
         private static readonly int[] ElementsPerAxis2 = { 256, 16, 16 };
@@ -284,6 +250,26 @@ namespace Compression.tests.MGroup.Solvers.Tests
                 new object[] { ElementsPerAxis4, LengthPerAxis, true,  true,  6, 8 },
             };
 
+        /// <summary>
+        /// Geometric Multigrid test for cantilever.
+        /// </summary>
+        /// <remarks>
+        /// <list type="bullet">
+        /// <item>Cantilever with quad elements or hexa elements</item>
+        /// <item>Geometric multigrid with deep V of 1 (simple), 2, 3, 4 and 6 lower levels</item>
+        /// <item>2 type of matrices: DUVI and CSR</item>
+        /// <item>2 type of smoothers: Jacobi and Gauss-Seidel</item>
+        /// <item>1, 2, 4, 6 and 8 smoother iterations</item>
+        /// </list>
+        /// </remarks>
+        /// <param name="elementsPerAxis">Number of elements in each axis. An array of 2 or 3.</param>
+        /// <param name="lengthPerAxis">Dimensions of object. An array of 3.</param>
+        /// <param name="GaussSeidel">Type of smoother. Gauss-Seidel or Jacobi.</param>
+        /// <param name="DuVi">Type of matrix, DuVi or CSR.</param>
+        /// <param name="depth">Depth of Geometric Multigrid.</param>
+        /// <param name="iterationsPerLevel">Smoother iterations in any level.</param>
+        /// <param name="iterations">Number of maximum iterations (one iteration is the full circle).</param>
+        /// <param name="convergenceTolerance">The residual must become smaller than this threshold.</param>
         [Theory]
         [MemberData(nameof(CantileverDataGM))]
         public static void CheckCantileverSolutionDeepV(int[] elementsPerAxis, double[] lengthPerAxis,
@@ -297,16 +283,54 @@ namespace Compression.tests.MGroup.Solvers.Tests
             CheckSolutionDeepV(model, GaussSeidel, DuVi, depth, iterationsPerLevel, iterations, convergenceTolerance);
         }
 
+        /// <summary>
+        /// Geometric Multigrid test for any type of model.
+        /// </summary>
+        /// <remarks>
+        /// This function is used from both cantilever and plate (or any other addition in the future).
+        /// <list type="bullet">
+        /// <item>Any type of model.</item>
+        /// <item>Geometric multigrid with deep V of 1 (simple), 2, 3, 4 and 6 lower levels</item>
+        /// <item>2 type of matrices: DUVI and CSR</item>
+        /// <item>2 type of smoothers: Jacobi and Gauss-Seidel</item>
+        /// <item>1, 2, 4, 6 and 8 smoother iterations</item>
+        /// </list>
+        /// </remarks>
+        /// <param name="model">The model.</param>
+        /// <param name="GaussSeidel">Type of smoother. Gauss-Seidel or Jacobi.</param>
+        /// <param name="DuVi">Type of matrix, DuVi or CSR.</param>
+        /// <param name="depth">Depth of Geometric Multigrid.</param>
+        /// <param name="iterationsPerLevel">Smoother iterations in any level.</param>
+        /// <param name="iterations">Number of maximum iterations (one iteration is the full circle).</param>
+        /// <param name="convergenceTolerance">The residual must become smaller than this threshold.</param>
         internal static void CheckSolutionDeepV(IGeometricMultigridModel model,
                                                             bool GaussSeidel, bool DuVi,
                                                             int depth = 2, int iterationsPerLevel = 4,
                                                             int iterations = 2000, double convergenceTolerance = 1e-5)
         {
             GeometricMultigridSolver.MatrixType mat = DuVi ? GeometricMultigridSolver.MatrixType.DUVI : GeometricMultigridSolver.MatrixType.CSR;
-
             Solve(() => GeometricMultigridSolver.CreateDeepV(model, GaussSeidel, mat, iterations, false, convergenceTolerance, depth, iterationsPerLevel));
-            Solve(model, iterations, convergenceTolerance); // CG
         }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        // ==================== PCG
+
+
+
+
+
 
         public static IEnumerable<object[]> CantileverDataCG =>
             new List<object[]>
@@ -316,6 +340,14 @@ namespace Compression.tests.MGroup.Solvers.Tests
                 new object[] { ElementsPerAxis3, LengthPerAxis },
                 new object[] { ElementsPerAxis4, LengthPerAxis },
             };
+
+        /// <summary>
+        /// PCG test for cantilever with quad or hexa elements and CSR matrix.
+        /// </summary>
+        /// <param name="elementsPerAxis">Number of elements in each axis. An array of 2 or 3.</param>
+        /// <param name="lengthPerAxis">Dimensions of object. An array of 3.</param>
+        /// <param name="iterations">Number of maximum iterations</param>
+        /// <param name="convergenceTolerance">The residual must become smaller than this threshold.</param>
         [Theory]
         [MemberData(nameof(CantileverDataCG))]
         public static void CheckCantileverSolutionCG(int[] elementsPerAxis, double[] lengthPerAxis,
@@ -324,7 +356,82 @@ namespace Compression.tests.MGroup.Solvers.Tests
             IGeometricMultigridModel model = elementsPerAxis.Length == 3
                  ? new FemCantilever3D(elementsPerAxis, lengthPerAxis)
                  : new FemCantilever2D(elementsPerAxis, lengthPerAxis);
-           Solve(model, iterations, convergenceTolerance); // CG
+           SolveCG(model, iterations, convergenceTolerance); // CG
+        }
+
+        /// <summary>
+        /// Solves the model with PCG with CSR matrix.
+        /// </summary>
+        /// <param name="model">The model.</param>
+        /// <param name="iterations">Number of maximum iterations allowed before failure.</param>
+        /// <param name="convergenceTolerance">A residual must be at most this threshold.</param>
+        internal static void SolveCG(IGeometricMultigridModel model, int iterations, double convergenceTolerance)
+        {
+            Stopwatch stopwatch = new Stopwatch();
+            stopwatch.Restart();
+
+            // Initialization
+            (DokRowMajor A, Vector b) = model.CreateLinearSystem();
+            CsrMatrix stiffness = A.BuildCsrMatrix(true);
+            CGAlgorithm.Builder builder = new CGAlgorithm.Builder();
+            builder.ResidualTolerance = convergenceTolerance;
+            builder.MaxIterationsProvider = new FixedMaxIterationsProvider(iterations);
+            CGAlgorithm methodCG = builder.Build();
+
+            stopwatch.Stop();
+            double timeCGI = stopwatch.Elapsed.TotalMilliseconds;
+            Vector x = Vector.CreateZero(model.NumDofsFree);
+            stopwatch.Restart();
+            //TODO: IterativeStatistics stats = methodCG.Solve(stiffness, b, x, true);  // Solve
+            /// =============== REIMPLEMENT THE WHEEL FOR DEBUG PURPOSES
+            IterativeStatistics stats = new();
+            stats.HasConverged = false;
+            stats.NumIterationsRequired = iterations;
+            {
+                Vector M = Vector.CreateFromArray(stiffness.GetDiagonalAsArray());
+                for (int i = 0; i < M.Length; ++i)
+                    M.RawData[i] = 1 / M.RawData[i];
+
+                Vector r = b.Copy();
+                r.SubtractIntoThis(stiffness.Multiply(x));
+                Vector z = M.MultiplyEntrywise(r);
+                Vector p = z.Copy();
+                double rz = r.DotProduct(z);
+
+                for (int iteration = 0; iteration < iterations; ++iteration)
+                {
+                    Vector Ap = stiffness.Multiply(p);
+                    double a = rz / p.DotProduct(Ap);
+                    x.AddIntoThis(p.Scale(a));
+                    r.AddIntoThis(Ap.Scale(-a));
+
+                    bool nobreak = false;
+                    for (int i = 0; i < r.Length; ++i)
+                        if (Math.Abs(r[i]) > convergenceTolerance) nobreak = true;
+                        else stats.ResidualNormRatioEstimation = Math.Abs(r[i]);
+                    if (!nobreak) { stats.HasConverged = true; stats.NumIterationsRequired = iteration; break; }
+
+                    z = M.MultiplyEntrywise(r);
+                    double rz2 = r.DotProduct(z);
+                    double beta = rz2 / rz;
+                    p.ScaleIntoThis(beta);
+                    p.AddIntoThis(z);
+                    rz = rz2;
+                }
+            }
+            /// =============== END REIMPLEMENTATION
+
+            stopwatch.Stop();
+            double timeCG = stopwatch.Elapsed.TotalMilliseconds;
+            File.AppendAllText(GMCantileverOpenCLTests.logFilePath, $"\nRequired time for CG with matrix type CSR: {timeCGI + timeCG}ms\n");
+            File.AppendAllText(GMCantileverOpenCLTests.logFilePath, $"\tTarget machine: CPU with C#\n");
+            File.AppendAllText(GMCantileverOpenCLTests.logFilePath, $"\tMethod: CG\n");
+            File.AppendAllText(GMCantileverOpenCLTests.logFilePath, $"\tMatrix type: CSR\n");
+            File.AppendAllText(GMCantileverOpenCLTests.logFilePath, $"\tInitialization: {timeCGI}ms\n");
+            File.AppendAllText(GMCantileverOpenCLTests.logFilePath, $"\tSolve: {timeCG}ms\n");
+            if (stats.HasConverged)
+                File.AppendAllText(GMCantileverOpenCLTests.logFilePath, $"\tCONVERGED after {stats.NumIterationsRequired} iterations and a residual of {stats.ResidualNormRatioEstimation}\n");
+            else File.AppendAllText(GMCantileverOpenCLTests.logFilePath, $"\tNOT converged after {stats.NumIterationsRequired} iterations and a residual of {stats.ResidualNormRatioEstimation}\n");
         }
     }
 }

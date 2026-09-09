@@ -21,7 +21,7 @@ namespace MGroup.FEM.Structural.Tests.Plates.Plotting
 				x[i] = 0.1 * i;
 				f[i] = x[i] * x[i];
 			}
-			string path = "C:\\1\\quadraticFuncDiagram.vtk";
+			string path = "C:\\quadraticFuncDiagram.vtk";
 			VtkExporter.Write2DLinePlot(path, x, f);
 		}
 
@@ -43,8 +43,8 @@ namespace MGroup.FEM.Structural.Tests.Plates.Plotting
 				w.Add(new double[] { 0, 0, f[n] });
 			}
 
-			VtkExporter.WriteScalarField("C:\\1\\surface_scalar.vtk", mesh, f);
-			VtkExporter.WriteVectorField("C:\\1\\surface_vector.vtk", mesh, w);
+			VtkExporter.WriteScalarField("C:\\surface_scalar.vtk", mesh, f);
+			VtkExporter.WriteVectorField("C:\\surface_vector.vtk", mesh, w);
 		}
 	}
 }

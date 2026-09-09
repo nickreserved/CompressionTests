@@ -12,6 +12,7 @@ using MGroup.MSolve.Solution.AlgebraicModel;
 using MGroup.MSolve.Solution.LinearSystem;
 using MGroup.NumericalAnalyzers;
 using MGroup.Solvers.Direct;
+using MGroup.Solvers.Iterative;
 using Xunit;
 
 namespace MGroup.FEM.Structural.Tests.Plates
@@ -26,7 +27,7 @@ namespace MGroup.FEM.Structural.Tests.Plates
 			(Model model, UniformCartesianMesh2D mesh) = CreateModel();
 			(IGlobalVector solution, IAlgebraicModel algebraicModel) = SolveModel(model);
 
-			string outputFolder = "C:\\1";
+			string outputFolder = "C:\\";
 			var plotter = new PlateStructurePlotter(model, algebraicModel, mesh, outputFolder);
 
 			// Plot nodal displacements
@@ -110,8 +111,10 @@ namespace MGroup.FEM.Structural.Tests.Plates
 
 		private static (IGlobalVector solution, IAlgebraicModel algebraicModel) SolveModel(Model model)
 		{
-			var solverFactory = new LdlSkylineSolver.Factory();
-			var algebraicModel = solverFactory.BuildAlgebraicModel(model);
+			//TODO: var solverFactory = new LdlSkylineSolver.Factory();
+            var solverFactory = new PcgSolver.Factory();
+
+            var algebraicModel = solverFactory.BuildAlgebraicModel(model);
 			ISolver solver = solverFactory.BuildSolver(algebraicModel);
 			var problem = new ProblemStructural(model, algebraicModel);
 

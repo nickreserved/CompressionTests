@@ -22,8 +22,8 @@ namespace Compression.tests.MGroup.Solvers.Tests
 
         [Theory]
         [MemberData(
-            nameof(GMCantileverTests.CantileverDataCG),
-            MemberType = typeof(GMCantileverTests)
+            nameof(GMPlateTests.PlateDataCG),
+            MemberType = typeof(GMPlateTests)
         )]
         public static void CheckPlateSolutionCGWithOpenCL(int[] elementsPerAxis, double[] lengthPerAxis)
         {
