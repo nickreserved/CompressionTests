@@ -243,7 +243,7 @@ namespace Compression.tests.MGroup.Solvers.Tests
         /// <param name="lengthPerAxis">Dimensions of object. An array of 3.</param>
         /// <param name="iterations">Number of maximum iterations</param>
         /// <param name="convergenceTolerance">The residual must become smaller than this threshold.</param>
-        public static void CheckCantileverSolutionCG(int[] elementsPerAxis, double[] lengthPerAxis,
+        public static void CheckPlateSolutionCG(int[] elementsPerAxis, double[] lengthPerAxis,
                                                                     int iterations = 2000, double convergenceTolerance = 1e-5)
         {
             IGeometricMultigridModel model = new FemPlate(elementsPerAxis, lengthPerAxis, ElasticityModulus, PoissonRatio, DistributedLoad);
