@@ -4,6 +4,7 @@ using MGroup.LinearAlgebra.Iterative.Stationary;
 using MGroup.LinearAlgebra.Iterative.Stationary.CSR;
 using MGroup.LinearAlgebra.Matrices;
 using MGroup.LinearAlgebra.Matrices.Builders;
+using MGroup.LinearAlgebra.Reduction;
 using MGroup.LinearAlgebra.Triangulation;
 using MGroup.LinearAlgebra.Vectors;
 using System.Diagnostics;
@@ -137,8 +138,8 @@ namespace Compression.src.MGroup.Solvers.Multigrid
         {
             double l = 0;   // max eigenvalue
             for (int i = 0; i < rows.Length; ++i)
-                //l = Math.Max(l, rows[i].Values.Select(v => Math.Abs(v)).Sum() / Math.Abs(rows[i][i])); // approximation of max eigenvalue
-                l = Math.Max(l, rows[i].Values.Select(v => Math.Abs(v)).Sum() / rows[i].Values.Select(v => Math.Abs(v)).Max()); // approximation of max eigenvalue
+                l = Math.Max(l, rows[i].Values.Select(v => Math.Abs(v)).Sum() / Math.Abs(rows[i][i])); // approximation of max eigenvalue
+                //l = Math.Max(l, rows[i].Values.Select(v => Math.Abs(v)).Sum() / rows[i].Values.Select(v => Math.Abs(v)).Max()); // approximation of max eigenvalue
             return l;
         }
 
@@ -153,7 +154,8 @@ namespace Compression.src.MGroup.Solvers.Multigrid
         /// <param name="l">An approximation of the upper bound for the eigenvalues of the matrix.</param>
         internal static void RelaxateJacobiPreconditioner(Vector x, double l)
         {
-            l = 2 / l;
+            //l = 2 / l;
+            l = Math.Max(2 / l, 2e-6 / x.Min()); // doubtable treatment for numerical stability
             for (int i = 0; i < x.Length; ++i)
                 x[i] *= l;
         }
