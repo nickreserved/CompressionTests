@@ -29,7 +29,11 @@ namespace Compression.tests.MGroup.Solvers.Tests
         /// </list>
         /// </remarks>
         [Fact]
-        public static void CheckCantilever2dSolutionV() => CheckSolutionV(new FemCantilever2D(ElementsPerAxis1, LengthPerAxis));
+        public static void CheckCantilever2dSolutionV()
+        {
+            GMCantileverOpenCLTests.OutputCantileverInfo(ElementsPerAxis1, LengthPerAxis);
+            CheckSolutionV(new FemCantilever2D(ElementsPerAxis1, LengthPerAxis));
+        }
 
         /// <summary>
         /// Geometric Multigrid test for any type of model.
@@ -46,13 +50,15 @@ namespace Compression.tests.MGroup.Solvers.Tests
         /// <param name="model">The model.</param>
         internal static void CheckSolutionV(IGeometricMultigridModel model)
         {
-            double convergenceTolerance = 1e-4;
+            double convergenceTolerance = 1e-6;
             int iterations = 100000;
 
-            Solve(() => GeometricMultigridSolver.CreateSimpleV(model, false, GeometricMultigridSolver.MatrixType.CSR, iterations, false, convergenceTolerance));
-            Solve(() => GeometricMultigridSolver.CreateSimpleV(model, false, GeometricMultigridSolver.MatrixType.DUVI, iterations, false, convergenceTolerance));
-            Solve(() => GeometricMultigridSolver.CreateSimpleV(model, true, GeometricMultigridSolver.MatrixType.CSR, iterations, false, convergenceTolerance));
-            Solve(() => GeometricMultigridSolver.CreateSimpleV(model, true, GeometricMultigridSolver.MatrixType.DUVI, iterations, false, convergenceTolerance));
+            string log = GMCantileverOpenCLTests.OutputDimDofs(model);
+
+            Solve(() => GeometricMultigridSolver.CreateSimpleV(model, false, GeometricMultigridSolver.MatrixType.CSR, iterations, false, convergenceTolerance), log);
+            Solve(() => GeometricMultigridSolver.CreateSimpleV(model, false, GeometricMultigridSolver.MatrixType.DUVI, iterations, false, convergenceTolerance), log);
+            Solve(() => GeometricMultigridSolver.CreateSimpleV(model, true, GeometricMultigridSolver.MatrixType.CSR, iterations, false, convergenceTolerance), log);
+            Solve(() => GeometricMultigridSolver.CreateSimpleV(model, true, GeometricMultigridSolver.MatrixType.DUVI, iterations, false, convergenceTolerance), log);
         }
 
         /// <summary>
@@ -62,7 +68,8 @@ namespace Compression.tests.MGroup.Solvers.Tests
         /// This function is used from both cantilever and plate (or any other addition in the future).
         /// </remarks>
         /// <param name="initializer">A lambda expression with no parameters, which returns a GeometricMultigridSolver object.</param>
-        internal static void Solve(Func<GeometricMultigridSolver> initializer)
+        /// <param name="log">String with information for output</param>
+        internal static void Solve(Func<GeometricMultigridSolver> initializer, string log)
         {
             Stopwatch stopwatch = new Stopwatch();
             stopwatch.Restart();
@@ -75,17 +82,20 @@ namespace Compression.tests.MGroup.Solvers.Tests
             stopwatch.Stop();
             double timeGMGS = stopwatch.Elapsed.TotalMilliseconds;
 
-            File.AppendAllText(GMCantileverOpenCLTests.logFilePath, $"\nRequired time for Geometric Multigrid: {timeGMGI + timeGMGS}ms\n");
-            File.AppendAllText(GMCantileverOpenCLTests.logFilePath, $"\tTarget machine: CPU with C#\n");
-            File.AppendAllText(GMCantileverOpenCLTests.logFilePath, $"\tMethod: {(solver.GaussSeidel ? "Gauss-Seidel" : "Jacobi")}\n");
-            File.AppendAllText(GMCantileverOpenCLTests.logFilePath, $"\tMatrix type: {(solver.MatType == GeometricMultigridSolver.MatrixType.CSR ? "CSR" : "DuVi")}\n");
-            File.AppendAllText(GMCantileverOpenCLTests.logFilePath, $"\tInitialization: {timeGMGI}ms\n");
-            File.AppendAllText(GMCantileverOpenCLTests.logFilePath, $"\tSolve: {timeGMGS}ms\n");
-            if (stats.HasConverged)
-                File.AppendAllText(GMCantileverOpenCLTests.logFilePath, $"\tCONVERGED after {stats.NumIterationsRequired} iterations and a residual of {stats.ConvergenceCriterion.value}\n");
-            else File.AppendAllText(GMCantileverOpenCLTests.logFilePath, $"\tNOT converged after {stats.NumIterationsRequired} iterations and a residual of {stats.ConvergenceCriterion.value}\n");
-            for (int i = 0; i < time.Length; ++i)
-                File.AppendAllText(GMCantileverOpenCLTests.logFilePath, $"\tLevel {i}: {time[i]}ms\n");
+            File.AppendAllText(GMCantileverOpenCLTests.logFilePath,
+                "Target machine: CPU with C#\n" +
+                "Method: Geometric Multigrid\n" +
+                $"Smoother: {(solver.GaussSeidel ? "Gauss-Seidel" : "Jacobi")}\n" +
+                $"Matrix type: {(solver.MatType == GeometricMultigridSolver.MatrixType.CSR ? "CSR" : "DuVi")}\n" +
+                $"Smoother iterations: {solver.LevelSteps}\n" +
+                log +
+                $"Depth of V: {solver.TotalLevels}\n" +
+                $"Initialization: {timeGMGI}ms\n" +
+                $"Solve: {timeGMGS}ms\n" +
+                $"Total time: {timeGMGI + timeGMGS}ms\n" +
+                $"{(stats.HasConverged ? "CONVERGED" : "NOT converged")} after {stats.NumIterationsRequired} iterations and a residual of {stats.ConvergenceCriterion.value}\n");
+            //for (int i = 0; i < time.Length; ++i)
+            //    File.AppendAllText(GMCantileverOpenCLTests.logFilePath, $"Level {i}: {time[i]}ms\n");
 
             Xunit.Assert.True(stats.HasConverged);
         }
@@ -277,6 +287,7 @@ namespace Compression.tests.MGroup.Solvers.Tests
                                                                     int depth = 2, int iterationsPerLevel = 4,
                                                                     int iterations = 2000, double convergenceTolerance = 1e-5)
         {
+            GMCantileverOpenCLTests.OutputCantileverInfo(elementsPerAxis, lengthPerAxis);
             IGeometricMultigridModel model = elementsPerAxis.Length == 3
                  ? new FemCantilever3D(elementsPerAxis, lengthPerAxis)
                  : new FemCantilever2D(elementsPerAxis, lengthPerAxis);
@@ -309,11 +320,9 @@ namespace Compression.tests.MGroup.Solvers.Tests
                                                             int iterations = 2000, double convergenceTolerance = 1e-5)
         {
             GeometricMultigridSolver.MatrixType mat = DuVi ? GeometricMultigridSolver.MatrixType.DUVI : GeometricMultigridSolver.MatrixType.CSR;
-            Solve(() => GeometricMultigridSolver.CreateDeepV(model, GaussSeidel, mat, iterations, false, convergenceTolerance, depth, iterationsPerLevel));
+            Solve(() => GeometricMultigridSolver.CreateDeepV(model, GaussSeidel, mat, iterations, false, convergenceTolerance, depth, iterationsPerLevel),
+                GMCantileverOpenCLTests.OutputDimDofs(model));
         }
-
-
-
 
 
 
@@ -353,6 +362,7 @@ namespace Compression.tests.MGroup.Solvers.Tests
         public static void CheckCantileverSolutionCG(int[] elementsPerAxis, double[] lengthPerAxis,
                                                                     int iterations = 2000, double convergenceTolerance = 1e-5)
         {
+            GMCantileverOpenCLTests.OutputCantileverInfo(elementsPerAxis, lengthPerAxis);
             IGeometricMultigridModel model = elementsPerAxis.Length == 3
                  ? new FemCantilever3D(elementsPerAxis, lengthPerAxis)
                  : new FemCantilever2D(elementsPerAxis, lengthPerAxis);
@@ -423,15 +433,15 @@ namespace Compression.tests.MGroup.Solvers.Tests
 
             stopwatch.Stop();
             double timeCG = stopwatch.Elapsed.TotalMilliseconds;
-            File.AppendAllText(GMCantileverOpenCLTests.logFilePath, $"\nRequired time for CG with matrix type CSR: {timeCGI + timeCG}ms\n");
-            File.AppendAllText(GMCantileverOpenCLTests.logFilePath, $"\tTarget machine: CPU with C#\n");
-            File.AppendAllText(GMCantileverOpenCLTests.logFilePath, $"\tMethod: CG\n");
-            File.AppendAllText(GMCantileverOpenCLTests.logFilePath, $"\tMatrix type: CSR\n");
-            File.AppendAllText(GMCantileverOpenCLTests.logFilePath, $"\tInitialization: {timeCGI}ms\n");
-            File.AppendAllText(GMCantileverOpenCLTests.logFilePath, $"\tSolve: {timeCG}ms\n");
-            if (stats.HasConverged)
-                File.AppendAllText(GMCantileverOpenCLTests.logFilePath, $"\tCONVERGED after {stats.NumIterationsRequired} iterations and a residual of {stats.ResidualNormRatioEstimation}\n");
-            else File.AppendAllText(GMCantileverOpenCLTests.logFilePath, $"\tNOT converged after {stats.NumIterationsRequired} iterations and a residual of {stats.ResidualNormRatioEstimation}\n");
+            File.AppendAllText(GMCantileverOpenCLTests.logFilePath,
+                "Target machine: CPU with C#\n" +
+                "Method: PCG\n" +
+                "Matrix type: CSR\n" +
+                GMCantileverOpenCLTests.OutputDimDofs(model) +
+                $"Initialization: {timeCGI}ms\n" +
+                $"Solve: {timeCG}ms\n" +
+                $"Total time: {timeCGI + timeCG}ms\n" +
+                $"{(stats.HasConverged ? "CONVERGED" : "NOT converged")} after {stats.NumIterationsRequired} iterations and a residual of {stats.ResidualNormRatioEstimation}\n");
         }
     }
 }

@@ -18,7 +18,11 @@ namespace Compression.tests.MGroup.Solvers.Tests
         /// <item>2 type of smoothers: Jacobi and Gauss-Seidel</item>
         /// </list>
         /// </remarks>
-        public static void CheckPlateSolutionV() => GMCantileverTests.CheckSolutionV(new FemPlate(ElementsPerAxis1, LengthPerAxis, ElasticityModulus, PoissonRatio, DistributedLoad));
+        public static void CheckPlateSolutionV()
+        {
+            OutputPlateInfo(ElementsPerAxis1, LengthPerAxis);
+            GMCantileverTests.CheckSolutionV(new FemPlate(ElementsPerAxis1, LengthPerAxis, ElasticityModulus, PoissonRatio, DistributedLoad));
+        }
      
 
         internal static readonly double ElasticityModulus = 52416;
@@ -223,6 +227,7 @@ namespace Compression.tests.MGroup.Solvers.Tests
                                                                     int depth = 2, int iterationsPerLevel = 4,
                                                                     int iterations = 2000, double convergenceTolerance = 1e-5)
         {
+            OutputPlateInfo(elementsPerAxis, lengthPerAxis);
             IGeometricMultigridModel model = new FemPlate(elementsPerAxis, lengthPerAxis, ElasticityModulus, PoissonRatio, DistributedLoad);
             GMCantileverTests.CheckSolutionDeepV(model, GaussSeidel, DuVi, depth, iterationsPerLevel, iterations, convergenceTolerance);
         }
@@ -246,8 +251,16 @@ namespace Compression.tests.MGroup.Solvers.Tests
         public static void CheckPlateSolutionCG(int[] elementsPerAxis, double[] lengthPerAxis,
                                                                     int iterations = 2000, double convergenceTolerance = 1e-5)
         {
+            OutputPlateInfo(elementsPerAxis, lengthPerAxis);
             IGeometricMultigridModel model = new FemPlate(elementsPerAxis, lengthPerAxis, ElasticityModulus, PoissonRatio, DistributedLoad);
             GMCantileverTests.SolveCG(model, iterations, convergenceTolerance); // CG
         }
+
+        internal static void OutputPlateInfo(int[] elementsPerAxis, double[] lengthPerAxis) => File.AppendAllText(GMCantileverOpenCLTests.logFilePath,
+                $"\nPLATE\n" +
+                $"Dimensions: {lengthPerAxis[0]} x {lengthPerAxis[1]} x {lengthPerAxis[2]}\n" + 
+                $"Elements: {elementsPerAxis[0]} x {elementsPerAxis[1]}\n" +                
+                $"E: {ElasticityModulus}, v: {PoissonRatio}, p: {DistributedLoad}\n");
+
     }
 }

@@ -15,6 +15,7 @@ namespace Compression.tests.MGroup.Solvers.Tests
                                                                     bool GaussSeidel, bool DuVi,
                                                                     int depth = 2, int iterationsPerLevel = 4)
         {
+            GMPlateTests.OutputPlateInfo(elementsPerAxis, lengthPerAxis);
             IGeometricMultigridModel model = new FemPlate(elementsPerAxis, lengthPerAxis,
                                 GMPlateTests.ElasticityModulus, GMPlateTests.PoissonRatio, GMPlateTests.DistributedLoad);
             GMCantileverOpenCLTests.CheckSolutionDeepVWithOpenCL(model, GaussSeidel, DuVi, depth, iterationsPerLevel);
@@ -27,6 +28,7 @@ namespace Compression.tests.MGroup.Solvers.Tests
         )]
         public static void CheckPlateSolutionCGWithOpenCL(int[] elementsPerAxis, double[] lengthPerAxis)
         {
+            GMPlateTests.OutputPlateInfo(elementsPerAxis, lengthPerAxis);
             IGeometricMultigridModel model = new FemPlate(elementsPerAxis, lengthPerAxis,
                                 GMPlateTests.ElasticityModulus, GMPlateTests.PoissonRatio, GMPlateTests.DistributedLoad);
             GMCantileverOpenCLTests.CheckSolutionCGWithOpenCL(model);

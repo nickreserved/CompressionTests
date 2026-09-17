@@ -194,7 +194,7 @@ namespace Compression.src.MGroup.Solvers.Multigrid
                 (model, DokRowMajor restrictionB, DokRowMajor interpolationB) = IGeometricMultigridModel.CreateCoarserModelAndSmoothenerMatrices(model);
                 LevelDoFs[i + 1] = restrictionB.NumRows;
                 preconditioners[i] = coarseRelaxation ? GeometricMultigridSolver.JacobiPreconditioner(A.RawRows)
-                                                        : GeometricMultigridSolver.RelaxedJacobiPreconditioner(A.RawRows);
+                                                        : GeometricMultigridSolver.RelaxedJacobiPreconditioner(A);
                 mat[3 * i + 0] = FromDokRowMajor(A);
                 mat[3 * i + 1] = FromDokRowMajor(restrictionB);
                 mat[3 * i + 2] = FromDokRowMajor(interpolationB);

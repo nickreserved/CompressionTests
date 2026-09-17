@@ -62,6 +62,7 @@ namespace Compression.tests.MGroup.Solvers.Tests
                                                                     bool GaussSeidel, bool DuVi,
                                                                     int depth = 2, int iterationsPerLevel = 4)
         {
+            OutputCantileverInfo(elementsPerAxis, lengthPerAxis);
             IGeometricMultigridModel model = elementsPerAxis.Length == 3
                 ? new FemCantilever3D(elementsPerAxis, lengthPerAxis)
                 : new FemCantilever2D(elementsPerAxis, lengthPerAxis);
@@ -89,19 +90,19 @@ namespace Compression.tests.MGroup.Solvers.Tests
             stopwatch.Stop();
             double timeGMGS = stopwatch.Elapsed.TotalMilliseconds;
             solver.ReleaseOpenCLResources();
-            File.AppendAllText(logFilePath, $"\nRequired time for Geometric Multigrid: {timeGMGI + timeGMGS}ms\n");
-            File.AppendAllText(logFilePath, $"\tTarget machine: GPU {device.name}\n");
-            File.AppendAllText(logFilePath, $"\tMethod: {(GaussSeidel ? "Gauss-Seidel" : "Jacobi")}\n");
-            File.AppendAllText(logFilePath, $"\tMatrix type: {(DuVi ? "DuVi" : "CSR")}\n");
-            File.AppendAllText(logFilePath, $"\tDimensions: {model.Mesh.Dimension}\n");
-            File.AppendAllText(logFilePath, $"\tFree DoFs: {model.NumDofsFree}\n");
-            File.AppendAllText(logFilePath, $"\tDepth of V: {depth}\n");
-            File.AppendAllText(logFilePath, $"\tSmoother iterations: {iterationsPerLevel}\n");
-            File.AppendAllText(logFilePath, $"\tInitialization: {timeGMGI}ms\n");
-            File.AppendAllText(logFilePath, $"\tSolve: {timeGMGS}ms\n");
-            if (stats.HasConverged)
-                File.AppendAllText(logFilePath, $"\tCONVERGED after {stats.NumIterationsRequired} iterations and a residual of {stats.ConvergenceCriterion.value}\n");
-            else File.AppendAllText(logFilePath, $"\tNOT converged after {stats.NumIterationsRequired} iterations and a residual of {stats.ConvergenceCriterion.value}\n");
+            File.AppendAllText(logFilePath,
+                $"Target machine: GPU {device.name}\n" +
+                "Method: Geometric Multigrid\n" +
+                $"Smoother: {(GaussSeidel ? "Gauss-Seidel" : "Jacobi")}\n" +
+                $"Matrix type: {(DuVi ? "DuVi" : "CSR")}\n" +
+                $"Smoother iterations: {iterationsPerLevel}\n" +
+                OutputDimDofs(model) +
+                $"Depth of V: {depth}\n" +
+                $"Initialization: {timeGMGI}ms\n" +
+                $"Solve: {timeGMGS}ms\n" +
+                $"Total time: {timeGMGI + timeGMGS}ms\n" +
+                $"{(stats.HasConverged ? "CONVERGED" : "NOT converged")} after {stats.NumIterationsRequired} iterations and a residual of {stats.ConvergenceCriterion.value}\n");
+
             Xunit.Assert.True(stats.HasConverged);
             //File.WriteAllText("result_vector_x.txt", string.Join("\n", x.RawData));
         }
@@ -113,6 +114,7 @@ namespace Compression.tests.MGroup.Solvers.Tests
         )]
         public static void CheckCantileverSolutionCGWithOpenCL(int[] elementsPerAxis, double[] lengthPerAxis)
         {
+            OutputCantileverInfo(elementsPerAxis, lengthPerAxis );
             IGeometricMultigridModel model = elementsPerAxis.Length == 3
                 ? new FemCantilever3D(elementsPerAxis, lengthPerAxis)
                 : new FemCantilever2D(elementsPerAxis, lengthPerAxis);
@@ -137,15 +139,16 @@ namespace Compression.tests.MGroup.Solvers.Tests
             stopwatch.Stop();
             double timePCGS = stopwatch.Elapsed.TotalMilliseconds;
             solver.ReleaseOpenCLResources();
-            File.AppendAllText(logFilePath, $"\nRequired time for PCG method with CSR matrix type: {timePCGI + timePCGS}ms\n");
-            File.AppendAllText(logFilePath, $"\tTarget machine: GPU {device.name}\n");
-            File.AppendAllText(logFilePath, $"\tDimensions: {model.Mesh.Dimension}\n");
-            File.AppendAllText(logFilePath, $"\tFree DoFs: {model.NumDofsFree}\n");
-            File.AppendAllText(logFilePath, $"\tInitialization: {timePCGI}ms\n");
-            File.AppendAllText(logFilePath, $"\tSolve: {timePCGS}ms\n");
-            if (stats.HasConverged)
-                File.AppendAllText(logFilePath, $"\tCONVERGED after {stats.NumIterationsRequired} iterations and a residual of {stats.ConvergenceCriterion.value}\n");
-            else File.AppendAllText(logFilePath, $"\tNOT converged after {stats.NumIterationsRequired} iterations and a residual of {stats.ConvergenceCriterion.value}\n");
+            File.AppendAllText(logFilePath,
+                $"Target machine: GPU {device.name}\n" +
+                "Method: PCG\n" +
+                "Matrix type: CSR\n" +
+                OutputDimDofs(model) +
+                $"Initialization: {timePCGI}ms\n" +
+                $"Solve: {timePCGS}ms\n" +
+                $"Total time: {timePCGI + timePCGS}ms\n" +
+                $"{(stats.HasConverged ? "CONVERGED" : "NOT converged")} after {stats.NumIterationsRequired} iterations and a residual of {stats.ConvergenceCriterion.value}\n");
+
             Xunit.Assert.True(stats.HasConverged);
             //File.WriteAllText("result_vector_x.txt", string.Join("\n", x.RawData));
         }
@@ -162,5 +165,14 @@ namespace Compression.tests.MGroup.Solvers.Tests
             Device device = devices[0];
             return (context, device);
         }
+
+        internal static string OutputDimDofs(IGeometricMultigridModel model) =>
+            $"Mesh dimensions: {model.Mesh.Dimension}\n" +
+            $"Free DoFs: {model.NumDofsFree}\n";
+
+        internal static void OutputCantileverInfo(int[] elementsPerAxis, double[] lengthPerAxis) => File.AppendAllText(GMCantileverOpenCLTests.logFilePath,
+            "\nCANTILEVER\n" +
+            $"Dimensions: {lengthPerAxis[0]} x {lengthPerAxis[1]} x {lengthPerAxis[2]}\n" +
+            $"Elements: {elementsPerAxis[0]} x {elementsPerAxis[1]}{(elementsPerAxis.Length == 3 ? $" x {elementsPerAxis[2]}" : "")}\n");
     }
 }
