@@ -475,7 +475,9 @@ namespace Compression.tests.MGroup.Solvers.Tests
             new List<object[]>
             {
                 new object[] { ElementsPerAxis1, LengthPerAxis },
-                new object[] { ElementsPerAxis2, LengthPerAxis }
+                new object[] { ElementsPerAxis2, LengthPerAxis },
+                new object[] { ElementsPerAxis3, LengthPerAxis },
+                new object[] { ElementsPerAxis4, LengthPerAxis }
             };
         [Theory]
         [MemberData(nameof(PlateDataCG))]
