@@ -62,6 +62,7 @@ namespace Compression.tests.MGroup.Solvers.Tests
                                                                     bool GaussSeidel, bool DuVi,
                                                                     int depth = 2, int iterationsPerLevel = 4)
         {
+            GMPlateTests.JacobiPingPong(GaussSeidel, iterationsPerLevel);
             OutputCantileverInfo(elementsPerAxis, lengthPerAxis);
             IGeometricMultigridModel model = elementsPerAxis.Length == 3
                 ? new FemCantilever3D(elementsPerAxis, lengthPerAxis)

@@ -220,24 +220,6 @@ namespace Compression.tests.MGroup.Solvers.Tests
                 new object[] { ElementsPerAxis2, LengthPerAxis, true,  false, 6, 8 },
                 new object[] { ElementsPerAxis2, LengthPerAxis, true,  true,  6, 8 },
 
-                new object[] { ElementsPerAxis3, LengthPerAxis, true,  false, 1, 1 },
-                new object[] { ElementsPerAxis3, LengthPerAxis, true,  true,  1, 1 },
-                new object[] { ElementsPerAxis3, LengthPerAxis, false, false, 1, 2 },
-                new object[] { ElementsPerAxis3, LengthPerAxis, false, true,  1, 2 },
-                new object[] { ElementsPerAxis3, LengthPerAxis, true,  false, 1, 2 },
-                new object[] { ElementsPerAxis3, LengthPerAxis, true,  true,  1, 2 },
-                new object[] { ElementsPerAxis3, LengthPerAxis, false, false, 1, 4 },
-                new object[] { ElementsPerAxis3, LengthPerAxis, false, true,  1, 4 },
-                new object[] { ElementsPerAxis3, LengthPerAxis, true,  false, 1, 4 },
-                new object[] { ElementsPerAxis3, LengthPerAxis, true,  true,  1, 4 },
-                new object[] { ElementsPerAxis3, LengthPerAxis, false, false, 1, 6 },
-                new object[] { ElementsPerAxis3, LengthPerAxis, false, true,  1, 6 },
-                new object[] { ElementsPerAxis3, LengthPerAxis, true,  false, 1, 6 },
-                new object[] { ElementsPerAxis3, LengthPerAxis, true,  true,  1, 6 },
-                new object[] { ElementsPerAxis3, LengthPerAxis, false, false, 1, 8 },
-                new object[] { ElementsPerAxis3, LengthPerAxis, false, true,  1, 8 },
-                new object[] { ElementsPerAxis3, LengthPerAxis, true,  false, 1, 8 },
-                new object[] { ElementsPerAxis3, LengthPerAxis, true,  true,  1, 8 },
                 new object[] { ElementsPerAxis3, LengthPerAxis, true,  false, 2, 1 },
                 new object[] { ElementsPerAxis3, LengthPerAxis, true,  true,  2, 1 },
                 new object[] { ElementsPerAxis3, LengthPerAxis, false, false, 2, 2 },
@@ -328,43 +310,25 @@ namespace Compression.tests.MGroup.Solvers.Tests
                 new object[] { ElementsPerAxis3, LengthPerAxis, false, true,  6, 8 },
                 new object[] { ElementsPerAxis3, LengthPerAxis, true,  false, 6, 8 },
                 new object[] { ElementsPerAxis3, LengthPerAxis, true,  true,  6, 8 },
+                new object[] { ElementsPerAxis3, LengthPerAxis, true,  false, 8, 1 },
+                new object[] { ElementsPerAxis3, LengthPerAxis, true,  true,  8, 1 },
+                new object[] { ElementsPerAxis3, LengthPerAxis, false, false, 8, 2 },
+                new object[] { ElementsPerAxis3, LengthPerAxis, false, true,  8, 2 },
+                new object[] { ElementsPerAxis3, LengthPerAxis, true,  false, 8, 2 },
+                new object[] { ElementsPerAxis3, LengthPerAxis, true,  true,  8, 2 },
+                new object[] { ElementsPerAxis3, LengthPerAxis, false, false, 8, 4 },
+                new object[] { ElementsPerAxis3, LengthPerAxis, false, true,  8, 4 },
+                new object[] { ElementsPerAxis3, LengthPerAxis, true,  false, 8, 4 },
+                new object[] { ElementsPerAxis3, LengthPerAxis, true,  true,  8, 4 },
+                new object[] { ElementsPerAxis3, LengthPerAxis, false, false, 8, 6 },
+                new object[] { ElementsPerAxis3, LengthPerAxis, false, true,  8, 6 },
+                new object[] { ElementsPerAxis3, LengthPerAxis, true,  false, 8, 6 },
+                new object[] { ElementsPerAxis3, LengthPerAxis, true,  true,  8, 6 },
+                new object[] { ElementsPerAxis3, LengthPerAxis, false, false, 8, 8 },
+                new object[] { ElementsPerAxis3, LengthPerAxis, false, true,  8, 8 },
+                new object[] { ElementsPerAxis3, LengthPerAxis, true,  false, 8, 8 },
+                new object[] { ElementsPerAxis3, LengthPerAxis, true,  true,  8, 8 },
 
-                new object[] { ElementsPerAxis4, LengthPerAxis, true,  false, 1, 1 },
-                new object[] { ElementsPerAxis4, LengthPerAxis, true,  true,  1, 1 },
-                new object[] { ElementsPerAxis4, LengthPerAxis, false, false, 1, 2 },
-                new object[] { ElementsPerAxis4, LengthPerAxis, false, true,  1, 2 },
-                new object[] { ElementsPerAxis4, LengthPerAxis, true,  false, 1, 2 },
-                new object[] { ElementsPerAxis4, LengthPerAxis, true,  true,  1, 2 },
-                new object[] { ElementsPerAxis4, LengthPerAxis, false, false, 1, 4 },
-                new object[] { ElementsPerAxis4, LengthPerAxis, false, true,  1, 4 },
-                new object[] { ElementsPerAxis4, LengthPerAxis, true,  false, 1, 4 },
-                new object[] { ElementsPerAxis4, LengthPerAxis, true,  true,  1, 4 },
-                new object[] { ElementsPerAxis4, LengthPerAxis, false, false, 1, 6 },
-                new object[] { ElementsPerAxis4, LengthPerAxis, false, true,  1, 6 },
-                new object[] { ElementsPerAxis4, LengthPerAxis, true,  false, 1, 6 },
-                new object[] { ElementsPerAxis4, LengthPerAxis, true,  true,  1, 6 },
-                new object[] { ElementsPerAxis4, LengthPerAxis, false, false, 1, 8 },
-                new object[] { ElementsPerAxis4, LengthPerAxis, false, true,  1, 8 },
-                new object[] { ElementsPerAxis4, LengthPerAxis, true,  false, 1, 8 },
-                new object[] { ElementsPerAxis4, LengthPerAxis, true,  true,  1, 8 },
-                new object[] { ElementsPerAxis4, LengthPerAxis, true,  false, 2, 1 },
-                new object[] { ElementsPerAxis4, LengthPerAxis, true,  true,  2, 1 },
-                new object[] { ElementsPerAxis4, LengthPerAxis, false, false, 2, 2 },
-                new object[] { ElementsPerAxis4, LengthPerAxis, false, true,  2, 2 },
-                new object[] { ElementsPerAxis4, LengthPerAxis, true,  false, 2, 2 },
-                new object[] { ElementsPerAxis4, LengthPerAxis, true,  true,  2, 2 },
-                new object[] { ElementsPerAxis4, LengthPerAxis, false, false, 2, 4 },
-                new object[] { ElementsPerAxis4, LengthPerAxis, false, true,  2, 4 },
-                new object[] { ElementsPerAxis4, LengthPerAxis, true,  false, 2, 4 },
-                new object[] { ElementsPerAxis4, LengthPerAxis, true,  true,  2, 4 },
-                new object[] { ElementsPerAxis4, LengthPerAxis, false, false, 2, 6 },
-                new object[] { ElementsPerAxis4, LengthPerAxis, false, true,  2, 6 },
-                new object[] { ElementsPerAxis4, LengthPerAxis, true,  false, 2, 6 },
-                new object[] { ElementsPerAxis4, LengthPerAxis, true,  true,  2, 6 },
-                new object[] { ElementsPerAxis4, LengthPerAxis, false, false, 2, 8 },
-                new object[] { ElementsPerAxis4, LengthPerAxis, false, true,  2, 8 },
-                new object[] { ElementsPerAxis4, LengthPerAxis, true,  false, 2, 8 },
-                new object[] { ElementsPerAxis4, LengthPerAxis, true,  true,  2, 8 },
                 new object[] { ElementsPerAxis4, LengthPerAxis, true,  false, 3, 1 },
                 new object[] { ElementsPerAxis4, LengthPerAxis, true,  true,  3, 1 },
                 new object[] { ElementsPerAxis4, LengthPerAxis, false, false, 3, 2 },
@@ -436,7 +400,25 @@ namespace Compression.tests.MGroup.Solvers.Tests
                 new object[] { ElementsPerAxis4, LengthPerAxis, false, false, 6, 8 },
                 new object[] { ElementsPerAxis4, LengthPerAxis, false, true,  6, 8 },
                 new object[] { ElementsPerAxis4, LengthPerAxis, true,  false, 6, 8 },
-                new object[] { ElementsPerAxis4, LengthPerAxis, true,  true,  6, 8 }, 
+                new object[] { ElementsPerAxis4, LengthPerAxis, true,  true,  6, 8 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, true,  false, 8, 1 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, true,  true,  8, 1 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, false, false, 8, 2 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, false, true,  8, 2 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, true,  false, 8, 2 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, true,  true,  8, 2 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, false, false, 8, 4 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, false, true,  8, 4 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, true,  false, 8, 4 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, true,  true,  8, 4 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, false, false, 8, 6 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, false, true,  8, 6 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, true,  false, 8, 6 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, true,  true,  8, 6 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, false, false, 8, 8 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, false, true,  8, 8 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, true,  false, 8, 8 },
+                new object[] { ElementsPerAxis4, LengthPerAxis, true,  true,  8, 8 },
             };
 
         [Theory]
@@ -465,6 +447,8 @@ namespace Compression.tests.MGroup.Solvers.Tests
                                                                     int depth = 2, int iterationsPerLevel = 4,
                                                                     int iterations = 2000, double convergenceTolerance = 1e-5)
         {
+            JacobiPingPong(GaussSeidel, iterationsPerLevel);
+            PossibleOutOfPhysicalMemory(elementsPerAxis, depth);
             OutputPlateInfo(elementsPerAxis, lengthPerAxis);
             IGeometricMultigridModel model = new FemPlate(elementsPerAxis, lengthPerAxis, ElasticityModulus, PoissonRatio, DistributedLoad);
             GMCantileverTests.CheckSolutionDeepV(model, GaussSeidel, DuVi, depth, iterationsPerLevel, iterations, convergenceTolerance);
@@ -502,5 +486,22 @@ namespace Compression.tests.MGroup.Solvers.Tests
                 $"Elements: {elementsPerAxis[0]} x {elementsPerAxis[1]}\n" +                
                 $"E: {ElasticityModulus}, v: {PoissonRatio}, p: {DistributedLoad}\n");
 
+        internal static void PossibleOutOfPhysicalMemory(int[] elementsPerAxis, int depth)
+        {
+            long totalPhysicalMemory = System.GC.GetGCMemoryInfo().TotalAvailableMemoryBytes;
+            long totalEntriesInMemory = totalPhysicalMemory = 8; // max number of 'double' matrix entries in memory 
+            long totalRowsInMemory = (long) (Math.Sqrt(totalEntriesInMemory) * 0.8); // max number of matrix rows in memory, with safety factor
+
+            int x = elementsPerAxis[0] >> depth; // elements in depth
+            int y = elementsPerAxis[1] >> depth; // elements in depth
+            ++x; ++y; // nodes in depth
+            long totalFreeDoFs = 3 * x * y - 3 * x - 2 * y + 6;
+
+            Xunit.Assert.False(totalFreeDoFs > totalRowsInMemory, "This test RAM requirement exceeds physical memory");
+        }
+
+        internal static void JacobiPingPong(bool GaussSeidel, int iterationsPerLevel) =>
+            Xunit.Assert.True(GaussSeidel || (iterationsPerLevel & 1) == 0,
+                "When Jacobi smoother used iterationsPerLevel must be multiple of 2 because buffer 'ping pong' method used");
     }
 }

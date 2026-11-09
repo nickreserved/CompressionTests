@@ -287,6 +287,7 @@ namespace Compression.tests.MGroup.Solvers.Tests
                                                                     int depth = 2, int iterationsPerLevel = 4,
                                                                     int iterations = 2000, double convergenceTolerance = 1e-5)
         {
+            GMPlateTests.JacobiPingPong(GaussSeidel, iterationsPerLevel);
             GMCantileverOpenCLTests.OutputCantileverInfo(elementsPerAxis, lengthPerAxis);
             IGeometricMultigridModel model = elementsPerAxis.Length == 3
                  ? new FemCantilever3D(elementsPerAxis, lengthPerAxis)
