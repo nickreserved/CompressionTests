@@ -16,6 +16,7 @@ namespace Compression.tests.MGroup.Solvers.Tests
                                                                     int depth = 2, int iterationsPerLevel = 4)
         {
             GMPlateTests.JacobiPingPong(GaussSeidel, iterationsPerLevel);
+            GMPlateTests.PowerOf2(elementsPerAxis, depth);
             GMPlateTests.PossibleOutOfPhysicalMemory(elementsPerAxis, depth);
             GMPlateTests.OutputPlateInfo(elementsPerAxis, lengthPerAxis);
             IGeometricMultigridModel model = new FemPlate(elementsPerAxis, lengthPerAxis,
