@@ -510,7 +510,7 @@ namespace Compression.tests.MGroup.Solvers.Tests
         internal static void DivisibleByPowerOf2(int[] elementsPerAxis, int depth)
         {
             for (int i = 0; i < elementsPerAxis.Length; ++i)
-                if (((elementsPerAxis[i] >> depth) << depth) == elementsPerAxis[i])
+                if (((elementsPerAxis[i] >> depth) << depth) != elementsPerAxis[i])
                     throw new Exception("Please fix number of elements per axis");
         }
     }
