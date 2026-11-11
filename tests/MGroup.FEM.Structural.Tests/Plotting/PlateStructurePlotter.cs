@@ -1,18 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using MGroup.Constitutive.Structural;
+﻿using MGroup.Constitutive.Structural;
 using MGroup.FEM.Structural.Tests.Plates.FemExtentions;
 using MGroup.LinearAlgebra.Vectors;
-using MGroup.MSolve.Discretization.Dofs;
 using MGroup.MSolve.Discretization.Entities;
 using MGroup.MSolve.Discretization.Meshes.Structured;
 using MGroup.MSolve.Solution.AlgebraicModel;
-using MGroup.MSolve.Solution.LinearSystem;
-using MGroup.Solvers.Results;
 
 namespace MGroup.FEM.Structural.Tests.Plates.Plotting
 {

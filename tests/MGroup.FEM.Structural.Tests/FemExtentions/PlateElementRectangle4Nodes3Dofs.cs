@@ -1,16 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using MGroup.Constitutive.Structural;
+﻿using MGroup.Constitutive.Structural;
 using MGroup.LinearAlgebra.Matrices;
 using MGroup.LinearAlgebra.Vectors;
 using MGroup.MSolve.DataStructures;
 using MGroup.MSolve.Discretization;
 using MGroup.MSolve.Discretization.Dofs;
 using MGroup.MSolve.Discretization.Entities;
-using Microsoft.VisualStudio.TestPlatform.ObjectModel;
 
 
 namespace MGroup.FEM.Structural.Tests.Plates.FemExtentions
@@ -117,6 +111,7 @@ namespace MGroup.FEM.Structural.Tests.Plates.FemExtentions
 
 		public Vector ConvertBodyForcesToNodal(double uniformLoadZ)
 		{
+			Console.WriteLine("Element " + ID);
 			double a = 0.5 * (Nodes[1].X - Nodes[0].X);
 			double b = 0.5 * (Nodes[2].Y - Nodes[1].Y);
 			double q = uniformLoadZ;

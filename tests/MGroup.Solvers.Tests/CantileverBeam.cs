@@ -31,7 +31,6 @@ using MGroup.MSolve.Discretization.Entities;
 using MGroup.MSolve.Discretization.Meshes.Generation;
 using MGroup.MSolve.Discretization.Meshes.Generation.Custom;
 using MGroup.MSolve.Solution.AlgebraicModel;
-using MGroup.MSolve.Solution.LinearSystem;
 
 namespace Compression.tests.MGroup.Solvers.Tests
 {

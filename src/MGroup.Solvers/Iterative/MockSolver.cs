@@ -4,12 +4,13 @@ namespace MGroup.Solvers.Iterative
 	using System.Collections.Generic;
 	using System.Text;
 
-	using MGroup.MSolve.Solution;
-	using MGroup.MSolve.Solution.LinearSystem;
-	using MGroup.Solvers.LinearAlgebraExtensions.Matrices.Builders;
-	using MGroup.Solvers.LinearSystem;
+    using MGroup.MSolve.Solution;
+    using MGroup.MSolve.Solution.LinearSystem;
+    using MGroup.Solvers.LinearAlgebraExtensions.Matrices.Builders;
+    using MGroup.Solvers.LinearSystem;
+    using System;
 
-	public class MockSolver : ISolver
+    public class MockSolver : ISolver
 	{
 		private readonly GlobalAlgebraicModel<DokRowMajor> algebraicModel;
 

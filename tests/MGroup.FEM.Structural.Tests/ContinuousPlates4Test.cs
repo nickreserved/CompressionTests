@@ -1,5 +1,4 @@
-﻿using CSparse.Factorization;
-using MGroup.Constitutive.Structural;
+﻿using MGroup.Constitutive.Structural;
 using MGroup.Constitutive.Structural.BoundaryConditions;
 using MGroup.FEM.Structural.Tests.Plates.Commons;
 using MGroup.FEM.Structural.Tests.Plates.FemExtentions;
@@ -9,9 +8,7 @@ using MGroup.MSolve.Discretization.Entities;
 using MGroup.MSolve.Discretization.Meshes.Structured;
 using MGroup.MSolve.Solution;
 using MGroup.MSolve.Solution.AlgebraicModel;
-using MGroup.MSolve.Solution.LinearSystem;
 using MGroup.NumericalAnalyzers;
-using MGroup.Solvers.Direct;
 using MGroup.Solvers.Iterative;
 using Xunit;
 

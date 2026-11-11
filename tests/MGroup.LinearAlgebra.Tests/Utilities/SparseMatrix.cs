@@ -1,18 +1,13 @@
 namespace MGroup.LinearAlgebra.Tests.Utilities
 {
-	using System;
-	using System.Collections.Generic;
-	using System.Diagnostics;
-	using System.Linq;
-	using System.Text;
-	using System.Threading.Tasks;
+    using MGroup.LinearAlgebra.Exceptions;
+    using MGroup.LinearAlgebra.Matrices;
+    using MGroup.LinearAlgebra.Vectors;
+    using System;
+    using System.Collections.Generic;
+    using System.Diagnostics;
 
-	using MGroup.LinearAlgebra.Exceptions;
-	using MGroup.LinearAlgebra.Matrices;
-	using MGroup.Solvers.LinearAlgebraExtensions.Matrices.Builders;
-	using MGroup.LinearAlgebra.Vectors;
-
-	public class SparseMatrix
+    public class SparseMatrix
 	{
 		public Dictionary<int, double>[] Rows { get; }
 

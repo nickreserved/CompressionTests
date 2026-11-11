@@ -4,7 +4,6 @@ using MGroup.Constitutive.Structural.BoundaryConditions;
 using MGroup.Constitutive.Structural.Providers;
 using MGroup.FEM.Structural.Tests.Plates.Commons;
 using MGroup.FEM.Structural.Tests.Plates.FemExtentions;
-using MGroup.LinearAlgebra.Matrices;
 using MGroup.LinearAlgebra.Vectors;
 using MGroup.MSolve.Discretization.Entities;
 using MGroup.MSolve.Discretization.Meshes.Structured;
@@ -41,29 +40,35 @@ namespace Compression.tests.MGroup.LinearAlgebra.Tests.TestData.SparseLinearSyst
 
         public (DokRowMajor A, Vector b) CreateLinearSystem()
         {
-            //var provider = new ElementStructuralStiffnessProvider();
-            var dofOrderer = new DofOrderer(new NodeMajorDofOrderingStrategy(), new NullReordering());
-            //var dofOrdering = dofOrderer.OrderFreeDofs(model.GetSubdomain(0), new MockBCInterpreter(model));
-            var matrixAssembler = new DokRowMajorMatrixAssembler(true);
-            //var dokMatrix = matrixAssembler.BuildGlobalMatrix(dofOrdering, model.EnumerateElements(0), provider);
 
-            var algebraicModel = new GlobalAlgebraicModel<DokRowMajor>(model, dofOrderer, matrixAssembler);
-
-            //var solverFactory = new PcgSolver.Factory();
-            ////var solverFactory = new LdlSkylineSolver.Factory();
-            //var algebraicModel = solverFactory.BuildAlgebraicModel(model);
-            //ISolver solver = solverFactory.BuildSolver(algebraicModel);
-            ISolver solver = new MockSolver(algebraicModel);
+            /* HACK: Ο αρχικός κώδικας που αργούσε απίστευτα πολύ
+            var solverFactory = new PcgSolver.Factory();
+            //var solverFactory = new LdlSkylineSolver.Factory();
+            var algebraicModel = solverFactory.BuildAlgebraicModel(model);
+            ISolver solver = solverFactory.BuildSolver(algebraicModel);
             var problem = new ProblemStructural(model, algebraicModel);
             var linearAnalyzer = new LinearAnalyzer(algebraicModel, solver, problem);
             var staticAnalyzer = new StaticAnalyzer(algebraicModel, problem, linearAnalyzer);
             staticAnalyzer.Initialize();
             //staticAnalyzer.Solve();
 
-            //CsrMatrix csrMatrix = algebraicModel.LinearSystem.Matrix.SingleMatrix;
-            //DokRowMajor dokMatrix = DokRowMajor.CreateFromSparseMatrix(csrMatrix);
-            Vector rhsVector = ((Vector)problem.GetRhs());
+            CsrMatrix csrMatrix = algebraicModel.LinearSystem.Matrix.SingleMatrix;
+            DokRowMajor dokMatrix = DokRowMajor.CreateFromSparseMatrix(csrMatrix);
+            Vector rhsVector = ((GlobalVector) problem.GetRhs()).SingleVector;
+            */
+            var algebraicModel = new GlobalAlgebraicModel<DokRowMajor>(model,
+                new DofOrderer(new NodeMajorDofOrderingStrategy(), new NullReordering()),
+                new DokRowMajorMatrixAssembler(true));
+            ISolver solver = new MockSolver(algebraicModel);
+            var problem = new ProblemStructural(model, algebraicModel);
+            var linearAnalyzer = new LinearAnalyzer(algebraicModel, solver, problem);
+            var staticAnalyzer = new StaticAnalyzer(algebraicModel, problem, linearAnalyzer);
+            staticAnalyzer.Initialize();
+            var rhsVector = new PlateElementVectorAssembler().BuildGlobalVector(
+                algebraicModel.SubdomainFreeDofOrdering,
+                model.EnumerateElements(0), DistributedLoad, true);
             var dokMatrix = (DokRowMajor) solver.LinearSystem.Matrix;
+
             return (dokMatrix, rhsVector);
         }
 
@@ -153,6 +158,7 @@ namespace Compression.tests.MGroup.LinearAlgebra.Tests.TestData.SparseLinearSyst
                     nodes[n] = model.NodesDictionary[nodeIDs[n]];
                 }
                 var element = new PlateElementRectangle4Nodes3Dofs(nodes, ElasticityModulus, PoissonRatio, Thickness);
+                element.ID = e;
                 model.ElementsDictionary[e] = element;
                 model.SubdomainsDictionary[subdomainID].Elements.Add(element);
                 elements.Add(element);
@@ -164,8 +170,10 @@ namespace Compression.tests.MGroup.LinearAlgebra.Tests.TestData.SparseLinearSyst
             foreach (INode node in supportedNodes.OrderBy(node => node.ID))
                 supports.Add(new NodalDisplacement(node, StructuralDof.TranslationZ, 0.0));
 
-            // Loads
-            List<NodalLoad> nodalLoads = BodyForcesConverter.ApplyUniformLoadOnAllPlateElements(model, DistributedLoad, supports);
+            // Load
+            // HACK: Κανονικά οι 2 γραμμές που ακολουθούν έπρεπε να είχαν διαφορετική σχολίαση αλλά παρατηρήθηκε ότι πάει πολύ αργά το πράγμα
+            // List<NodalLoad> nodalLoads = BodyForcesConverter.ApplyUniformLoadOnAllPlateElements(model, DistributedLoad, supports);
+            var nodalLoads = new List<NodalLoad>();
             model.BoundaryConditions.Add(new StructuralBoundaryConditionSet(supports, nodalLoads));
 
             return model;

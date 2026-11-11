@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using MGroup.MSolve.Discretization.Meshes.Structured;
+﻿using MGroup.MSolve.Discretization.Meshes.Structured;
 using Xunit;
 
 namespace MGroup.FEM.Structural.Tests.Plates.Plotting

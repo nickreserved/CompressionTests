@@ -6,21 +6,25 @@ namespace MGroup.Solvers.LinearAlgebraExtensions.Matrices.Builders
 	using System.Linq;
 	using System.Text;
 
-	using MGroup.LinearAlgebra.Commons;
-	using MGroup.LinearAlgebra.Exceptions;
-	using MGroup.LinearAlgebra.Implementations;
-	using MGroup.LinearAlgebra.Matrices;
+    using MGroup.LinearAlgebra.Commons;
+    using MGroup.LinearAlgebra.Exceptions;
+    using MGroup.LinearAlgebra.Implementations;
+    using MGroup.LinearAlgebra.Matrices;
 	using MGroup.Solvers.LinearAlgebraExtensions.Matrices.Builders;
-	using MGroup.LinearAlgebra.Output.Formatting;
-	using MGroup.LinearAlgebra.Vectors;
+    using MGroup.LinearAlgebra.Output.Formatting;
+    using MGroup.LinearAlgebra.Vectors;
+    using System;
+    using System.Collections.Generic;
+    using System.Diagnostics;
+    using System.Linq;
 
-	/// <summary>
-	/// Use this class for building large sparse matrices, e.g. <see cref="CsrMatrix"/>, not for operations. Convert to other 
-	/// matrix formats once finished and use them instead for matrix operations. The large matrices and their properties will be 
-	/// characterized as "global" in this namespace. This class is optimized for building global matrices with at least 1 entry 
-	/// per column and row major storage formats.
-	/// </summary>
-	public class DokRowMajor : DefaultMatrix, ISparseMatrix
+    /// <summary>
+    /// Use this class for building large sparse matrices, e.g. <see cref="CsrMatrix"/>, not for operations. Convert to other 
+    /// matrix formats once finished and use them instead for matrix operations. The large matrices and their properties will be 
+    /// characterized as "global" in this namespace. This class is optimized for building global matrices with at least 1 entry 
+    /// per column and row major storage formats.
+    /// </summary>
+    public class DokRowMajor : DefaultMatrix, ISparseMatrix
 	{
 		/// <summary>
 		/// See the rant in <see cref="DokSymmetric.columns"/> about performance.

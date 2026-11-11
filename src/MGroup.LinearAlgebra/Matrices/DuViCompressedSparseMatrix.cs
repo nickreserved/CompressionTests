@@ -1,9 +1,8 @@
 namespace MGroup.LinearAlgebra.Matrices
 {
     using MGroup.LinearAlgebra.Implementations;
-    using MGroup.Solvers.LinearAlgebraExtensions.Matrices.Builders;
-    using MGroup.LinearAlgebra.Reduction;
     using MGroup.LinearAlgebra.Vectors;
+    using MGroup.Solvers.LinearAlgebraExtensions.Matrices.Builders;
     using System;
     using System.Collections.Generic;
 
@@ -500,99 +499,24 @@ namespace MGroup.LinearAlgebra.Matrices
 			return result;
 		}
 
-        public void Set(int rowIdx, int colIdx, double value)
-        {
-            throw new NotImplementedException();
-        }
-
-        public IMatrix Axpy(IReadOnlyMatrix otherMatrix, double otherCoefficient)
-        {
-            throw new NotImplementedException();
-        }
-
-        public IMatrix Copy(bool copyIndexingData = false)
-        {
-            throw new NotImplementedException();
-        }
-
-        public IMatrix CreateZeroMatrixWithSameFormat()
-        {
-            throw new NotImplementedException();
-        }
-
-        public bool HasSameFormat(IReadOnlyMatrix other)
-        {
-            throw new NotImplementedException();
-        }
-
-        public IMatrix LinearCombination(double thisCoefficient, IReadOnlyMatrix otherMatrix, double otherCoefficient)
-        {
-            throw new NotImplementedException();
-        }
-
-        public IMatrix Scale(double scalar)
-        {
-            throw new NotImplementedException();
-        }
-
-        public IMatrix Transpose()
-        {
-            throw new NotImplementedException();
-        }
-
-        public IMatrix DoEntrywise(IReadOnlyMatrix matrix, Func<double, double, double> binaryOperation)
-        {
-            throw new NotImplementedException();
-        }
-
-        public IMatrix DoToAllEntries(Func<double, double> unaryOperation)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Vector GetColumn(int colIndex)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Vector GetRow(int rowIndex)
-        {
-            throw new NotImplementedException();
-        }
-
-        public IMatrix GetSubmatrix(int[] rowIndices, int[] colIndices)
-        {
-            throw new NotImplementedException();
-        }
-
-        public IMatrix GetSubmatrix(int rowStartInclusive, int rowEndExclusive, int colStartInclusive, int colEndExclusive)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Vector GetDiagonal()
-        {
-            throw new NotImplementedException();
-        }
-
-        public double[] GetDiagonalAsArray()
-        {
-            throw new NotImplementedException();
-        }
-
-        public bool Equals(IIndexable2D other, double tolerance = 1E-13)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void DoEntrywiseIntoThis(IReadOnlyMatrix matrix, Func<double, double, double> binaryOperation)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void DoToAllEntriesIntoThis(Func<double, double> unaryOperation)
-        {
-            throw new NotImplementedException();
-        }
+        public void Set(int rowIdx, int colIdx, double value) => throw new NotImplementedException();
+		public IMatrix Axpy(IReadOnlyMatrix otherMatrix, double otherCoefficient) => throw new NotImplementedException();
+		public IMatrix Copy(bool copyIndexingData = false) => throw new NotImplementedException();
+		public IMatrix CreateZeroMatrixWithSameFormat() => throw new NotImplementedException();
+		public bool HasSameFormat(IReadOnlyMatrix other) => throw new NotImplementedException();
+		public IMatrix LinearCombination(double thisCoefficient, IReadOnlyMatrix otherMatrix, double otherCoefficient) => throw new NotImplementedException();
+		public IMatrix Scale(double scalar) => throw new NotImplementedException();
+		public IMatrix Transpose() => throw new NotImplementedException();
+		public IMatrix DoEntrywise(IReadOnlyMatrix matrix, Func<double, double, double> binaryOperation) => throw new NotImplementedException();
+		public IMatrix DoToAllEntries(Func<double, double> unaryOperation) => throw new NotImplementedException();
+		public Vector GetColumn(int colIndex) => throw new NotImplementedException();
+		public Vector GetRow(int rowIndex) => throw new NotImplementedException();
+		public IMatrix GetSubmatrix(int[] rowIndices, int[] colIndices) => throw new NotImplementedException();
+		public IMatrix GetSubmatrix(int rowStartInclusive, int rowEndExclusive, int colStartInclusive, int colEndExclusive) => throw new NotImplementedException();
+		public Vector GetDiagonal() => throw new NotImplementedException();
+		public double[] GetDiagonalAsArray() => throw new NotImplementedException();
+		public bool Equals(IIndexable2D other, double tolerance = 1E-13) => throw new NotImplementedException();
+		public void DoEntrywiseIntoThis(IReadOnlyMatrix matrix, Func<double, double, double> binaryOperation) => throw new NotImplementedException();
+		public void DoToAllEntriesIntoThis(Func<double, double> unaryOperation) => throw new NotImplementedException();
     }
 }

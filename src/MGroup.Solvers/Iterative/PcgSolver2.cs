@@ -1,21 +1,16 @@
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
 using MGroup.LinearAlgebra.Iterative;
-using MGroup.LinearAlgebra.Iterative.ConjugateGradient;
 using MGroup.LinearAlgebra.Iterative.PreconditionedConjugateGradient;
 using MGroup.LinearAlgebra.Iterative.Preconditioning;
 using MGroup.LinearAlgebra.Matrices;
 using MGroup.LinearAlgebra.Vectors;
-using MGroup.MSolve.Discretization;
-using MGroup.MSolve.Discretization.Entities;
-using MGroup.MSolve.Solution;
 using MGroup.MSolve.DataStructures;
+using MGroup.MSolve.Discretization.Entities;
+using MGroup.MSolve.Solution.LinearSystem;
 using MGroup.Solvers.Assemblers;
 using MGroup.Solvers.DofOrdering;
 using MGroup.Solvers.DofOrdering.Reordering;
-using MGroup.MSolve.Solution.LinearSystem;
 using MGroup.Solvers.LinearSystem;
+using System.Diagnostics;
 
 namespace MGroup.Solvers.Iterative
 {
