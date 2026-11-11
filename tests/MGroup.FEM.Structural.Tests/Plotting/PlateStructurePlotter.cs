@@ -31,7 +31,7 @@ namespace MGroup.FEM.Structural.Tests.Plates.Plotting
 			this.directoryPath = directoryPath;
 		}
 
-		public void PlotDisplacementsAtNodes(IGlobalVector globalFreeDisplacements)
+		public void PlotDisplacementsAtNodes(IVector globalFreeDisplacements)
 		{
 			int numNodes = mesh.NumNodesTotal;
 			var pointDisplacements = new List<double[]>(numNodes);
@@ -55,7 +55,7 @@ namespace MGroup.FEM.Structural.Tests.Plates.Plotting
 			VtkExporter.WriteVectorField(file, mesh, pointDisplacements);
 		}
 
-		public void PlotDisplacementsAtGridPoints(UniformCartesianMesh2D plotGrid, IGlobalVector globalFreeDisplacements)
+		public void PlotDisplacementsAtGridPoints(UniformCartesianMesh2D plotGrid, IVector globalFreeDisplacements)
 		{
 			int numPoints = plotGrid.NumNodesTotal;
 			var pointDisplacements = new List<double[]>(numPoints);
@@ -73,7 +73,7 @@ namespace MGroup.FEM.Structural.Tests.Plates.Plotting
 			VtkExporter.WriteVectorField(file, plotGrid, pointDisplacements);
 		}
 
-		public void PlotMomentsAtGridPoints(UniformCartesianMesh2D plotGrid, IGlobalVector globalFreeDisplacements)
+		public void PlotMomentsAtGridPoints(UniformCartesianMesh2D plotGrid, IVector globalFreeDisplacements)
 		{
 			int numPoints = plotGrid.NumNodesTotal;
 

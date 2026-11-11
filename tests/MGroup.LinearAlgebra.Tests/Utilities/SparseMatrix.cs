@@ -9,7 +9,7 @@ namespace MGroup.LinearAlgebra.Tests.Utilities
 
 	using MGroup.LinearAlgebra.Exceptions;
 	using MGroup.LinearAlgebra.Matrices;
-	using MGroup.LinearAlgebra.Matrices.Builders;
+	using MGroup.Solvers.LinearAlgebraExtensions.Matrices.Builders;
 	using MGroup.LinearAlgebra.Vectors;
 
 	public class SparseMatrix
@@ -426,7 +426,7 @@ namespace MGroup.LinearAlgebra.Tests.Utilities
 			}
 		}
 
-		private void CheckSystemSolution(IVectorView vector)
+		private void CheckSystemSolution(IReadOnlyVector vector)
 		{
 			if (NumRows != NumColumns)
 			{
@@ -439,7 +439,7 @@ namespace MGroup.LinearAlgebra.Tests.Utilities
 			}
 		}
 
-		private void CheckVectorMult(IVectorView vector)
+		private void CheckVectorMult(IReadOnlyVector vector)
 		{
 			if (vector.Length != NumColumns)
 			{

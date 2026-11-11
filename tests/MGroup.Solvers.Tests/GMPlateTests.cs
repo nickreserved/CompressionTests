@@ -448,7 +448,7 @@ namespace Compression.tests.MGroup.Solvers.Tests
                                                                     int iterations = 2000, double convergenceTolerance = 1e-5)
         {
             JacobiPingPong(GaussSeidel, iterationsPerLevel);
-            PowerOf2(elementsPerAxis, depth);
+            DivisibleByPowerOf2(elementsPerAxis, depth);
             PossibleOutOfPhysicalMemory(elementsPerAxis, depth);
             OutputPlateInfo(elementsPerAxis, lengthPerAxis);
             IGeometricMultigridModel model = new FemPlate(elementsPerAxis, lengthPerAxis, ElasticityModulus, PoissonRatio, DistributedLoad);
@@ -501,15 +501,17 @@ namespace Compression.tests.MGroup.Solvers.Tests
             Xunit.Assert.False(totalFreeDoFs > totalRowsInMemory, "This test RAM requirement exceeds physical memory");
         }
 
-        internal static void JacobiPingPong(bool GaussSeidel, int iterationsPerLevel) =>
-            Xunit.Assert.True(GaussSeidel || (iterationsPerLevel & 1) == 0,
-                "When Jacobi smoother used iterationsPerLevel must be multiple of 2 because buffer 'ping pong' method used");
+        internal static void JacobiPingPong(bool GaussSeidel, int iterationsPerLevel)
+        {
+            if (!GaussSeidel && (iterationsPerLevel & 1) != 0)
+                throw new Exception("When Jacobi smoother used iterationsPerLevel must be multiple of 2 because buffer 'ping pong' method used");
+        }
 
-        internal static void PowerOf2(int[] elementsPerAxis, int depth)
+        internal static void DivisibleByPowerOf2(int[] elementsPerAxis, int depth)
         {
             for (int i = 0; i < elementsPerAxis.Length; ++i)
-                Xunit.Assert.True(((elementsPerAxis[i] >> depth) << depth) == elementsPerAxis[i],
-                    "Please fix number of elements per axis");
+                if (((elementsPerAxis[i] >> depth) << depth) == elementsPerAxis[i])
+                    throw new Exception("Please fix number of elements per axis");
         }
     }
 }

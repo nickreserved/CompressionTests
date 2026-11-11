@@ -3,10 +3,10 @@ using MGroup.LinearAlgebra.Iterative;
 using MGroup.LinearAlgebra.Iterative.Stationary;
 using MGroup.LinearAlgebra.Iterative.Stationary.CSR;
 using MGroup.LinearAlgebra.Matrices;
-using MGroup.LinearAlgebra.Matrices.Builders;
 using MGroup.LinearAlgebra.Reduction;
 using MGroup.LinearAlgebra.Triangulation;
 using MGroup.LinearAlgebra.Vectors;
+using MGroup.Solvers.LinearAlgebraExtensions.Matrices.Builders;
 using System.Diagnostics;
 
 namespace Compression.src.MGroup.Solvers.Multigrid
@@ -25,10 +25,10 @@ namespace Compression.src.MGroup.Solvers.Multigrid
 
         private Vector b;
 
-        private IMatrixView[] LevelStiffness;
+        private IReadOnlyMatrix[] LevelStiffness;
         private LdlSkyline coarseStiffnessLdlFactorized;
-        private IMatrixView[] restriction;
-        private IMatrixView[] interpolation;
+        private IReadOnlyMatrix[] restriction;
+        private IReadOnlyMatrix[] interpolation;
 
         private Vector[] RelJacobiPreconditioner;
 
@@ -224,9 +224,9 @@ namespace Compression.src.MGroup.Solvers.Multigrid
             MakePath(ref totalLevels, ref LevelDown, ref firstLevel);
 
             // Generate coarser models
-            LevelStiffness = new IMatrixView[totalLevels - 1];
-            restriction = new IMatrixView[totalLevels - 1];
-            interpolation = new IMatrixView[totalLevels - 1];
+            LevelStiffness = new IReadOnlyMatrix[totalLevels - 1];
+            restriction = new IReadOnlyMatrix[totalLevels - 1];
+            interpolation = new IReadOnlyMatrix[totalLevels - 1];
             if (!GaussSeidel) RelJacobiPreconditioner = new Vector[totalLevels - 1];
             (DokRowMajor A, b) = Model.CreateLinearSystem();
             IGeometricMultigridModel model = Model;
@@ -260,7 +260,7 @@ namespace Compression.src.MGroup.Solvers.Multigrid
 #endif
         }
 
-        private static void OutputMatrix(IMatrixView[] A)
+        private static void OutputMatrix(IReadOnlyMatrix[] A)
         {
 #if DEBUG
             string path = "csr_matrices_cpu.txt";

@@ -1,16 +1,20 @@
 ﻿using Compression.src.MGroup.Solvers.Multigrid;
 using MGroup.Constitutive.Structural;
 using MGroup.Constitutive.Structural.BoundaryConditions;
+using MGroup.Constitutive.Structural.Providers;
 using MGroup.FEM.Structural.Tests.Plates.Commons;
 using MGroup.FEM.Structural.Tests.Plates.FemExtentions;
 using MGroup.LinearAlgebra.Matrices;
-using MGroup.LinearAlgebra.Matrices.Builders;
 using MGroup.LinearAlgebra.Vectors;
 using MGroup.MSolve.Discretization.Entities;
 using MGroup.MSolve.Discretization.Meshes.Structured;
 using MGroup.MSolve.Solution;
 using MGroup.NumericalAnalyzers;
+using MGroup.Solvers.Assemblers;
+using MGroup.Solvers.DofOrdering;
+using MGroup.Solvers.DofOrdering.Reordering;
 using MGroup.Solvers.Iterative;
+using MGroup.Solvers.LinearAlgebraExtensions.Matrices.Builders;
 using MGroup.Solvers.LinearSystem;
 
 namespace Compression.tests.MGroup.LinearAlgebra.Tests.TestData.SparseLinearSystems
@@ -36,20 +40,30 @@ namespace Compression.tests.MGroup.LinearAlgebra.Tests.TestData.SparseLinearSyst
         public double Thickness { get; } = 1;
 
         public (DokRowMajor A, Vector b) CreateLinearSystem()
-        { 
-            var solverFactory = new PcgSolver.Factory();
-            //var solverFactory = new LdlSkylineSolver.Factory();
-            var algebraicModel = solverFactory.BuildAlgebraicModel(model);
-            ISolver solver = solverFactory.BuildSolver(algebraicModel);
+        {
+            //var provider = new ElementStructuralStiffnessProvider();
+            var dofOrderer = new DofOrderer(new NodeMajorDofOrderingStrategy(), new NullReordering());
+            //var dofOrdering = dofOrderer.OrderFreeDofs(model.GetSubdomain(0), new MockBCInterpreter(model));
+            var matrixAssembler = new DokRowMajorMatrixAssembler(true);
+            //var dokMatrix = matrixAssembler.BuildGlobalMatrix(dofOrdering, model.EnumerateElements(0), provider);
+
+            var algebraicModel = new GlobalAlgebraicModel<DokRowMajor>(model, dofOrderer, matrixAssembler);
+
+            //var solverFactory = new PcgSolver.Factory();
+            ////var solverFactory = new LdlSkylineSolver.Factory();
+            //var algebraicModel = solverFactory.BuildAlgebraicModel(model);
+            //ISolver solver = solverFactory.BuildSolver(algebraicModel);
+            ISolver solver = new MockSolver(algebraicModel);
             var problem = new ProblemStructural(model, algebraicModel);
             var linearAnalyzer = new LinearAnalyzer(algebraicModel, solver, problem);
             var staticAnalyzer = new StaticAnalyzer(algebraicModel, problem, linearAnalyzer);
             staticAnalyzer.Initialize();
             //staticAnalyzer.Solve();
 
-            CsrMatrix csrMatrix = algebraicModel.LinearSystem.Matrix.SingleMatrix;
-            DokRowMajor dokMatrix = DokRowMajor.CreateFromSparseMatrix(csrMatrix);
-            Vector rhsVector = ((GlobalVector) problem.GetRhs()).SingleVector;
+            //CsrMatrix csrMatrix = algebraicModel.LinearSystem.Matrix.SingleMatrix;
+            //DokRowMajor dokMatrix = DokRowMajor.CreateFromSparseMatrix(csrMatrix);
+            Vector rhsVector = ((Vector)problem.GetRhs());
+            var dokMatrix = (DokRowMajor) solver.LinearSystem.Matrix;
             return (dokMatrix, rhsVector);
         }
 

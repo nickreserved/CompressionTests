@@ -1,6 +1,7 @@
-﻿using MGroup.LinearAlgebra.Matrices.Builders;
+﻿//using MGroup.Solvers.LinearAlgebraExtensions.Matrices.Builders;
 using MGroup.LinearAlgebra.Vectors;
 using MGroup.MSolve.Discretization.Meshes.Structured;
+using MGroup.Solvers.LinearAlgebraExtensions.Matrices.Builders;
 
 namespace Compression.src.MGroup.Solvers.Multigrid
 {

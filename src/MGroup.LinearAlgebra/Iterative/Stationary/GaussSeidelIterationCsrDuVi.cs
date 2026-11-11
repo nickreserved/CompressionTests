@@ -17,7 +17,7 @@ namespace Compression.src.MGroup.LinearAlgebra.Iterative.Stationary
 
         public void LinkWith(IStationaryIteration other) { }
 
-        public void UpdateMatrix(IMatrixView m, bool isPatternModified) => mat = (DuViCompressedSparseMatrix) m;
+        public void UpdateMatrix(IReadOnlyMatrix m, bool isPatternModified) => mat = (DuViCompressedSparseMatrix) m;
 
         public void Execute(Vector b, Vector x)
         {

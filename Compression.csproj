@@ -12,10 +12,10 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'" />
 
   <ItemGroup>
-    <PackageReference Include="MGroup.FEM.Structural" Version="0.2.0-unstable.137" />
-    <PackageReference Include="MGroup.LinearAlgebra" Version="0.1.0-unstable.226" />
-    <PackageReference Include="MGroup.NumericalAnalyzers.Discretization" Version="0.2.0-unstable.68" />
-    <PackageReference Include="MGroup.Solvers" Version="0.2.0-unstable.99" />
+    <PackageReference Include="MGroup.FEM.Structural" Version="0.2.0-unstable.152" />
+    <PackageReference Include="MGroup.LinearAlgebra" Version="0.1.0-unstable.291" />
+    <PackageReference Include="MGroup.NumericalAnalyzers.Discretization" Version="0.2.0-unstable.83" />
+    <PackageReference Include="MGroup.Solvers" Version="0.2.0-unstable.115" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.0" />
     <PackageReference Include="MSTest.TestAdapter" Version="4.0.1" />
     <PackageReference Include="MSTest.TestFramework" Version="4.0.1" />

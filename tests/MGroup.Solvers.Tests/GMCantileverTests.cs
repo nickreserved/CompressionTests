@@ -4,7 +4,7 @@ using MGroup.LinearAlgebra.Iterative;
 using MGroup.LinearAlgebra.Iterative.ConjugateGradient;
 using MGroup.LinearAlgebra.Iterative.Termination.Iterations;
 using MGroup.LinearAlgebra.Matrices;
-using MGroup.LinearAlgebra.Matrices.Builders;
+using MGroup.Solvers.LinearAlgebraExtensions.Matrices.Builders;
 using MGroup.LinearAlgebra.Vectors;
 using System.Diagnostics;
 using Xunit;
@@ -288,7 +288,7 @@ namespace Compression.tests.MGroup.Solvers.Tests
                                                                     int iterations = 2000, double convergenceTolerance = 1e-5)
         {
             GMPlateTests.JacobiPingPong(GaussSeidel, iterationsPerLevel);
-            GMPlateTests.PowerOf2(elementsPerAxis, depth);
+            GMPlateTests.DivisibleByPowerOf2(elementsPerAxis, depth);
             GMCantileverOpenCLTests.OutputCantileverInfo(elementsPerAxis, lengthPerAxis);
             IGeometricMultigridModel model = elementsPerAxis.Length == 3
                  ? new FemCantilever3D(elementsPerAxis, lengthPerAxis)

@@ -63,7 +63,7 @@ namespace Compression.tests.MGroup.Solvers.Tests
                                                                     int depth = 2, int iterationsPerLevel = 4)
         {
             GMPlateTests.JacobiPingPong(GaussSeidel, iterationsPerLevel);
-            GMPlateTests.PowerOf2(elementsPerAxis, depth);
+            GMPlateTests.DivisibleByPowerOf2(elementsPerAxis, depth);
             OutputCantileverInfo(elementsPerAxis, lengthPerAxis);
             IGeometricMultigridModel model = elementsPerAxis.Length == 3
                 ? new FemCantilever3D(elementsPerAxis, lengthPerAxis)

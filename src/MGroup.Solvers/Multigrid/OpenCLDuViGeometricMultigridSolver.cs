@@ -3,7 +3,7 @@ using CASS.Types;
 using Compression.src.MGroup.OCL;
 using MGroup.LinearAlgebra.Iterative;
 using MGroup.LinearAlgebra.Matrices;
-using MGroup.LinearAlgebra.Matrices.Builders;
+using MGroup.Solvers.LinearAlgebraExtensions.Matrices.Builders;
 using MGroup.LinearAlgebra.Triangulation;
 using MGroup.LinearAlgebra.Vectors;
 using MGroup.OCL;

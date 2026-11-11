@@ -25,7 +25,7 @@ namespace MGroup.FEM.Structural.Tests.Plates
 		public static void Run()
 		{
 			(Model model, UniformCartesianMesh2D mesh) = CreateModel();
-			(IGlobalVector solution, IAlgebraicModel algebraicModel) = SolveModel(model);
+			(IVector solution, IAlgebraicModel algebraicModel) = SolveModel(model);
 
 			string outputFolder = "C:\\";
 			var plotter = new PlateStructurePlotter(model, algebraicModel, mesh, outputFolder);
@@ -109,7 +109,7 @@ namespace MGroup.FEM.Structural.Tests.Plates
 			return (model, mesh);
 		}
 
-		private static (IGlobalVector solution, IAlgebraicModel algebraicModel) SolveModel(Model model)
+		private static (IVector solution, IAlgebraicModel algebraicModel) SolveModel(Model model)
 		{
 			//TODO: var solverFactory = new LdlSkylineSolver.Factory();
             var solverFactory = new PcgSolver.Factory();

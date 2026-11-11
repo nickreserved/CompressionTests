@@ -11,7 +11,7 @@ using MGroup.MSolve.Discretization;
 using MGroup.MSolve.Discretization.Dofs;
 using MGroup.MSolve.Discretization.Entities;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel;
-using TriangleNet.Topology;
+
 
 namespace MGroup.FEM.Structural.Tests.Plates.FemExtentions
 {

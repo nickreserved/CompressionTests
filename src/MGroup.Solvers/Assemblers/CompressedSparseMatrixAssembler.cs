@@ -1,5 +1,5 @@
 using MGroup.LinearAlgebra.Matrices;
-using MGroup.LinearAlgebra.Matrices.Builders;
+using MGroup.Solvers.LinearAlgebraExtensions.Matrices.Builders;
 using MGroup.MSolve.Discretization;
 using MGroup.MSolve.Discretization.Providers;
 using MGroup.Solvers.DofOrdering;
